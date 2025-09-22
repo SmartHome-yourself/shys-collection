@@ -1,0 +1,24 @@
+alias: Notify multiple Alexa
+fields:
+  default_speakers:
+    description: "Wenn true, wird nur eine reduzierte Player-Liste verwendet."
+    example: true
+  message:
+    description: "Die Nachricht, die Alexa sprechen soll."
+    example: "Hallo zusammen!"
+variables:
+  player_list: >
+    {% if default_speakers %}
+      ['media_player.echo_dot_buro', 'media_player.echo_wohnzimmer', 'daniels_echo_dot']
+    {% else %}
+      ['media_player.echo_dot_buro', 'media_player.echo_dot_hobbyraum', 'media_player.echo_wohnzimmer', 'daniels_echo_dot']
+    {% endif %}
+sequence:
+  - action: notify.alexa_media
+    data:
+      target: "{{ player_list | list | join(', ') }}"
+      data:
+        type: announce
+        method: speak
+      message: "[ \"<amazon:effect name=\"whispered\">{{ message }}</amazon:effect>\", ]"
+mode: queued

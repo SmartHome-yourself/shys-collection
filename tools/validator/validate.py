@@ -33,6 +33,7 @@ def check_structure():
         "templates/home-assistant/blueprints",
         "templates/home-assistant/integrations",
         "templates/home-assistant/dashboard",
+        "templates/home-assistant/scripts",
         "templates/nodered/flows",
     ]
     for rel in must:
@@ -51,6 +52,7 @@ def check_category_roots():
         "templates/home-assistant/integrations",
         "templates/home-assistant/dashboard",
         "templates/home-assistant/blueprints",
+        "templates/home-assistant/scripts",
         "templates/nodered/flows"
     ]
 
@@ -150,6 +152,25 @@ def check_ha():
             if not yamls:
                 err(f"Keine YAML in {rel_path}")
 
+def check_ha_scripts():
+    """Prüft Home Assistant Scripts - ähnlich wie ESPHome setups"""
+    base = REPO / "templates/home-assistant/scripts"
+    if not base.exists(): return
+    for script in [d for d in base.iterdir() if d.is_dir()]:
+        slug = script.name
+        if not kebab_ok(slug):
+            err("Script-Ordnername ungültig: Nur Kleinbuchstaben, Ziffern und Bindestrich (-) erlaubt.", script)
+        readme = script / "README.md"
+        if not readme.exists():
+            err("README.md fehlt (Scripts)", script)
+        # YAML-Dateien müssen direkt im Script-Ordner liegen (Projekt-Root)
+        yamls = list(script.glob("*.yaml"))
+        if not yamls:
+            err("Keine YAML im Script-Ordner gefunden (mind. eine .yaml erforderlich)", script)
+        for child in script.iterdir():
+            if child.is_dir() and child.name not in {"assets", "variants"}:
+                err(f"Unerlaubter Ordner in scripts/{script.name}: {child.name}", child)
+
 
 
 #        if haProject.exists():
@@ -169,6 +190,7 @@ def main():
     check_esphome_setups()
     check_hardware()
     check_ha()
+    check_ha_scripts()  # Neue Prüfung für Home Assistant Scripts
     check_nodered()
 
     if errors:

@@ -8,7 +8,7 @@ Fokus: **einfach**, **überschaubar**, **konsistente Ordner**. Optional gibt's e
 /templates
   /esphome/{snippets,setups}
   /hardware/<board-name>/{kicad,manufacturing,esphome,assets}
-  /home-assistant/{integrations,dashboard}
+  /home-assistant/{integrations,dashboard,scripts}
   /nodered/flows
 /skeletons
   /esphome-{snippet,setup}-template
