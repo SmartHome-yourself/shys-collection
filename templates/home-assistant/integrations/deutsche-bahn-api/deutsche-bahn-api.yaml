@@ -1,0 +1,458 @@
+# Deutsche Bahn API Integration
+# Echtzeit-Zugdaten für lokale Bahnhöfe mit Verspätungen und Störungen
+
+# Basis-Konfiguration - API Key über https://developers.deutschebahn.com/
+# Kostenloser Zugang für private Nutzung verfügbar
+
+# REST-Sensoren für Timetable API
+sensor:
+  # Nächste Abfahrten vom Heimatbahnhof
+  - platform: rest
+    name: "DB Abfahrten Heimat"
+    resource_template: >
+      https://apis.deutschebahn.com/db-api-marketplace/apis/timetables/v1/station/{{ states('input_text.db_home_station_id') }}/{{ now().strftime('%y%m%d/%H%M') }}
+    headers:
+      Authorization: !secret db_api_key
+      Accept: application/json
+    scan_interval: 300  # Alle 5 Minuten
+    value_template: "{{ value_json.length if value_json else 0 }}"
+    unit_of_measurement: "Züge"
+    json_attributes_path: "$[0:5]"  # Erste 5 Abfahrten
+    json_attributes:
+      - dp
+      - ar  
+      - category
+      - number
+      - line
+      - to
+      - platform
+      - delay
+
+  # Nächste Abfahrten vom Arbeitsplatz
+  - platform: rest
+    name: "DB Abfahrten Arbeit"
+    resource_template: >
+      https://apis.deutschebahn.com/db-api-marketplace/apis/timetables/v1/station/{{ states('input_text.db_work_station_id') }}/{{ now().strftime('%y%m%d/%H%M') }}
+    headers:
+      Authorization: !secret db_api_key
+      Accept: application/json
+    scan_interval: 300
+    value_template: "{{ value_json.length if value_json else 0 }}"
+    unit_of_measurement: "Züge"
+    json_attributes_path: "$[0:5]"
+    json_attributes:
+      - dp
+      - ar
+      - category  
+      - number
+      - line
+      - to
+      - platform
+      - delay
+
+  # Verbindungssuche Hin (Morgens zur Arbeit)
+  - platform: rest
+    name: "DB Verbindung Hinfahrt"
+    resource_template: >
+      https://apis.deutschebahn.com/db-api-marketplace/apis/timetables/v1/journey/{{ states('input_text.db_home_station_id') }}/{{ states('input_text.db_work_station_id') }}/{{ (now() + timedelta(minutes=30)).strftime('%y%m%d/%H%M') }}
+    headers:
+      Authorization: !secret db_api_key
+      Accept: application/json
+    scan_interval: 600  # Alle 10 Minuten
+    value_template: >
+      {% if value_json and value_json|length > 0 %}
+        {{ value_json[0].duration if value_json[0].duration else "N/A" }}
+      {% else %}
+        "Keine Verbindung"
+      {% endif %}
+    json_attributes_path: "$[0]"
+    json_attributes:
+      - departure
+      - arrival
+      - duration
+      - changes
+      - delay
+      - products
+
+  # Verbindungssuche Rück (Abends nach Hause)
+  - platform: rest
+    name: "DB Verbindung Rückfahrt"
+    resource_template: >
+      https://apis.deutschebahn.com/db-api-marketplace/apis/timetables/v1/journey/{{ states('input_text.db_work_station_id') }}/{{ states('input_text.db_home_station_id') }}/{{ (now() + timedelta(hours=8)).strftime('%y%m%d/%H%M') }}
+    headers:
+      Authorization: !secret db_api_key
+      Accept: application/json
+    scan_interval: 900  # Alle 15 Minuten
+    value_template: >
+      {% if value_json and value_json|length > 0 %}
+        {{ value_json[0].duration if value_json[0].duration else "N/A" }}
+      {% else %}
+        "Keine Verbindung"
+      {% endif %}
+    json_attributes_path: "$[0]"
+    json_attributes:
+      - departure
+      - arrival
+      - duration
+      - changes
+      - delay
+      - products
+
+# StaDa (Station Data) API für Bahnhofsinformationen
+  - platform: rest
+    name: "DB Station Info Heimat"
+    resource_template: >
+      https://apis.deutschebahn.com/db-api-marketplace/apis/station-data/v2/stations/{{ states('input_text.db_home_station_id') }}
+    headers:
+      Authorization: !secret db_api_key
+      Accept: application/json
+    scan_interval: 86400  # Einmal täglich
+    value_template: "{{ value_json.name if value_json else 'Unbekannt' }}"
+    json_attributes:
+      - name
+      - eva
+      - category
+      - federalState
+      - hasWiFi
+      - hasLockerSystem
+      - hasLostAndFound
+      - hasCarRental
+      - hasTravelNecessities
+
+# FaSta API für Facility Status (Aufzüge, Rolltreppen)
+  - platform: rest
+    name: "DB Facilities Status"
+    resource_template: >
+      https://apis.deutschebahn.com/db-api-marketplace/apis/fasta/v2/facilities/{{ states('input_text.db_home_station_id') }}
+    headers:
+      Authorization: !secret db_api_key
+      Accept: application/json
+    scan_interval: 600
+    value_template: >
+      {% if value_json and value_json.facilities %}
+        {{ value_json.facilities | selectattr('state', 'equalto', 'ACTIVE') | list | length }}
+      {% else %}
+        0
+      {% endif %}
+    unit_of_measurement: "Aktiv"
+    json_attributes_path: "$.facilities[*]"
+    json_attributes:
+      - type
+      - state
+      - description
+
+# Template-Sensoren für benutzerfreundliche Darstellung
+  - platform: template
+    sensors:
+      db_next_departure_time:
+        friendly_name: "Nächste Abfahrt"
+        value_template: >
+          {% set departures = state_attr('sensor.db_abfahrten_heimat', 'dp') %}
+          {% if departures and departures|length > 0 %}
+            {% set next_dp = departures[0] %}
+            {% if next_dp.delay %}
+              {{ next_dp.time }} (+{{ next_dp.delay }})
+            {% else %}
+              {{ next_dp.time }}
+            {% endif %}
+          {% else %}
+            "Keine Daten"
+          {% endif %}
+        icon_template: "mdi:train"
+
+      db_next_departure_platform:
+        friendly_name: "Nächster Bahnsteig"
+        value_template: >
+          {% set departures = state_attr('sensor.db_abfahrten_heimat', 'platform') %}
+          {% if departures and departures|length > 0 %}
+            {{ departures[0] }}
+          {% else %}
+            "Unbekannt"
+          {% endif %}
+        icon_template: "mdi:sign-direction"
+
+      db_next_departure_destination:
+        friendly_name: "Nächstes Ziel"
+        value_template: >
+          {% set departures = state_attr('sensor.db_abfahrten_heimat', 'to') %}
+          {% if departures and departures|length > 0 %}
+            {{ departures[0] }}
+          {% else %}
+            "Unbekannt"
+          {% endif %}
+        icon_template: "mdi:map-marker"
+
+      db_commute_duration:
+        friendly_name: "Arbeitsweg Dauer"
+        value_template: >
+          {% set duration = state_attr('sensor.db_verbindung_hinfahrt', 'duration') %}
+          {% if duration %}
+            {{ duration }} min
+          {% else %}
+            "Unbekannt"
+          {% endif %}
+        icon_template: "mdi:clock-outline"
+
+      db_commute_changes:
+        friendly_name: "Arbeitsweg Umstiege"
+        value_template: >
+          {% set changes = state_attr('sensor.db_verbindung_hinfahrt', 'changes') %}
+          {% if changes is not none %}
+            {{ changes }}
+          {% else %}
+            "Unbekannt"
+          {% endif %}
+        icon_template: "mdi:swap-horizontal"
+
+      db_total_delay:
+        friendly_name: "Gesamtverspätung heute"
+        unit_of_measurement: "min"
+        value_template: >
+          {% set home_delay = state_attr('sensor.db_abfahrten_heimat', 'delay') %}
+          {% set work_delay = state_attr('sensor.db_abfahrten_arbeit', 'delay') %}
+          {% set total = 0 %}
+          {% if home_delay %}
+            {% for delay in home_delay %}
+              {% if delay %}
+                {% set total = total + delay %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+          {% if work_delay %}
+            {% for delay in work_delay %}
+              {% if delay %}
+                {% set total = total + delay %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+          {{ total }}
+
+# Input Helper für Bahnhofs-IDs
+input_text:
+  db_home_station_id:
+    name: "Heimat-Bahnhof ID"
+    initial: "8000105"  # Beispiel: Frankfurt Hbf
+    max: 10
+    pattern: '[0-9]*'
+    mode: text
+
+  db_work_station_id:
+    name: "Arbeitsplatz-Bahnhof ID"
+    initial: "8000261"  # Beispiel: München Hbf
+    max: 10
+    pattern: '[0-9]*'
+    mode: text
+
+# Boolean Helper für Benachrichtigungen
+input_boolean:
+  db_notifications_enabled:
+    name: "Bahn-Benachrichtigungen aktiviert"
+    initial: true
+    icon: "mdi:bell-ring"
+
+  db_delay_alerts:
+    name: "Verspätungs-Alarme"
+    initial: true
+    icon: "mdi:alert-circle"
+
+  db_commute_mode:
+    name: "Pendler-Modus aktiv"
+    initial: false
+    icon: "mdi:briefcase"
+
+# Number Helper für Verspätungs-Schwelle
+input_number:
+  db_delay_threshold:
+    name: "Verspätungs-Alarm ab"
+    min: 5
+    max: 60
+    step: 5
+    initial: 15
+    unit_of_measurement: "min"
+    icon: "mdi:clock-alert"
+
+# Binäre Sensoren für Alarme
+binary_sensor:
+  - platform: template
+    sensors:
+      db_significant_delay:
+        friendly_name: "Erhebliche Verspätung"
+        value_template: >
+          {{ states('sensor.db_total_delay') | float > 
+             states('input_number.db_delay_threshold') | float }}
+        device_class: problem
+        delay_on: "00:02:00"
+
+      db_elevator_outage:
+        friendly_name: "Aufzug-Ausfall"
+        value_template: >
+          {% set facilities = state_attr('sensor.db_facilities_status', 'type') %}
+          {% set states_list = state_attr('sensor.db_facilities_status', 'state') %}
+          {% if facilities and states_list %}
+            {% for i in range(facilities|length) %}
+              {% if facilities[i] == 'ELEVATOR' and states_list[i] != 'ACTIVE' %}
+                true
+              {% endif %}
+            {% endfor %}
+            false
+          {% else %}
+            false
+          {% endif %}
+        device_class: problem
+
+      db_connection_available:
+        friendly_name: "Verbindung verfügbar"
+        value_template: >
+          {{ states('sensor.db_verbindung_hinfahrt') != 'Keine Verbindung' }}
+        device_class: connectivity
+
+      db_commute_time:
+        friendly_name: "Pendelzeit aktiv"
+        value_template: >
+          {% set now_time = now().hour * 100 + now().minute %}
+          {% set is_workday = now().weekday() < 5 %}
+          {% set morning_commute = 600 <= now_time <= 1000 %}  # 06:00-10:00
+          {% set evening_commute = 1600 <= now_time <= 2000 %} # 16:00-20:00
+          {{ is_workday and (morning_commute or evening_commute) and
+             is_state('input_boolean.db_commute_mode', 'on') }}
+
+# Automatisierungen für Bahn-Benachrichtigungen
+automation:
+  - alias: "DB Verspätungs-Alarm"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.db_significant_delay
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: input_boolean.db_delay_alerts
+        state: "on"
+      - condition: state
+        entity_id: binary_sensor.db_commute_time
+        state: "on"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "🚆 Bahn-Verspätung"
+          message: >
+            Gesamtverspätung: {{ states('sensor.db_total_delay') }} Minuten
+            Nächste Abfahrt: {{ states('sensor.db_next_departure_time') }}
+          data:
+            tag: "train_delay"
+            group: "transport"
+            actions:
+              - action: "check_alternatives"
+                title: "Alternativen prüfen"
+
+  - alias: "DB Aufzug-Ausfall"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.db_elevator_outage
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: input_boolean.db_notifications_enabled
+        state: "on"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "♿ Aufzug außer Betrieb"
+          message: "Aufzug am {{ state_attr('sensor.db_station_info_heimat', 'name') }} defekt"
+          data:
+            tag: "elevator_outage"
+
+  - alias: "DB Morgendliche Pendler-Info"
+    trigger:
+      - platform: time
+        at: "07:00:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.db_commute_mode
+        state: "on"
+      - condition: time
+        weekday:
+          - mon
+          - tue
+          - wed
+          - thu
+          - fri
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "🌅 Pendler-Info"
+          message: >
+            Arbeitsweg: {{ states('sensor.db_commute_duration') }}
+            Umstiege: {{ states('sensor.db_commute_changes') }}
+            Nächste Abfahrt: {{ states('sensor.db_next_departure_time') }}
+            Bahnsteig: {{ states('sensor.db_next_departure_platform') }}
+
+  - alias: "DB Abendliche Rückfahrt-Erinnerung"
+    trigger:
+      - platform: time
+        at: "17:30:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.db_commute_mode
+        state: "on"
+      - condition: time
+        weekday:
+          - mon
+          - tue
+          - wed
+          - thu
+          - fri
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "🏠 Rückfahrt-Info"
+          message: >
+            Rückfahrt: {{ states('sensor.db_verbindung_rückfahrt') }}
+            {% if states('sensor.db_total_delay') | float > 10 %}
+            ⚠️ Aktuelle Verspätung: {{ states('sensor.db_total_delay') }} min
+            {% endif %}
+
+# Script für manuelle Verbindungssuche
+script:
+  db_search_connection:
+    alias: "DB Verbindung suchen"
+    fields:
+      from_station:
+        description: "Start-Bahnhof ID"
+        example: "8000105"
+      to_station:
+        description: "Ziel-Bahnhof ID"
+        example: "8000261"
+      departure_time:
+        description: "Abfahrtszeit (optional)"
+        example: "08:00"
+    sequence:
+      - service: notify.persistent_notification
+        data:
+          title: "DB Verbindungssuche"
+          message: "Suche Verbindung von {{ from_station }} nach {{ to_station }}..."
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.db_verbindung_hinfahrt
+      - delay: 5
+      - service: notify.mobile_app
+        data:
+          title: "🔍 Verbindung gefunden"
+          message: >
+            Dauer: {{ state_attr('sensor.db_verbindung_hinfahrt', 'duration') }} min
+            Umstiege: {{ state_attr('sensor.db_verbindung_hinfahrt', 'changes') }}
+            Abfahrt: {{ state_attr('sensor.db_verbindung_hinfahrt', 'departure') }}
+
+# Utility Meter für Statistiken
+utility_meter:
+  db_delays_monthly:
+    source: sensor.db_total_delay
+    cycle: monthly
+    name: "Monatliche Verspätungen"
+
+# Counter für Störungen
+counter:
+  db_disruptions_today:
+    name: "Störungen heute"
+    initial: 0
+    step: 1
+    icon: "mdi:train-car-passenger-door"

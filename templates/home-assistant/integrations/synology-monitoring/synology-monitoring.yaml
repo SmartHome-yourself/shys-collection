@@ -1,0 +1,493 @@
+# Synology NAS Monitoring Integration
+# Überwacht Synology DiskStation via REST API und SNMP
+
+# REST-API Basiskonfiguration
+# API muss in DSM aktiviert werden: Systemsteuerung > Terminal & SNMP > Web API aktivieren
+
+# System-Information
+sensor:
+  # Synology System Info über REST API
+  - platform: rest
+    name: "Synology System Info"
+    resource: "http://192.168.1.200:5000/webapi/entry.cgi"
+    method: POST
+    payload: 'api=SYNO.Core.System&version=1&method=info'
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+    value_template: "{{ value_json.data.model if value_json.success else 'Offline' }}"
+    json_attributes_path: "$.data"
+    json_attributes:
+      - cpu_family
+      - cpu_series
+      - model
+      - ram_size
+      - serial
+      - version
+      - version_string
+    scan_interval: 3600
+
+  # CPU Auslastung
+  - platform: rest
+    name: "Synology CPU Usage"
+    resource: "http://192.168.1.200:5000/webapi/entry.cgi"
+    method: POST
+    payload: 'api=SYNO.Core.System.Utilization&version=1&method=get'
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+    value_template: "{{ value_json.data.cpu.user_load if value_json.success else 0 }}"
+    unit_of_measurement: "%"
+    scan_interval: 60
+    icon: "mdi:cpu-64-bit"
+
+  # RAM Auslastung
+  - platform: rest
+    name: "Synology Memory Usage"
+    resource: "http://192.168.1.200:5000/webapi/entry.cgi"
+    method: POST
+    payload: 'api=SYNO.Core.System.Utilization&version=1&method=get'
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+    value_template: >
+      {% if value_json.success %}
+        {{ (value_json.data.memory.real_usage * 100 / value_json.data.memory.memory_size) | round(1) }}
+      {% else %}
+        0
+      {% endif %}
+    unit_of_measurement: "%"
+    scan_interval: 60
+    icon: "mdi:memory"
+
+  # Netzwerk-Traffic (Download)
+  - platform: rest
+    name: "Synology Network RX"
+    resource: "http://192.168.1.200:5000/webapi/entry.cgi"
+    method: POST
+    payload: 'api=SYNO.Core.System.Utilization&version=1&method=get'
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+    value_template: >
+      {% if value_json.success %}
+        {{ (value_json.data.network[0].rx / 1024 / 1024) | round(2) }}
+      {% else %}
+        0
+      {% endif %}
+    unit_of_measurement: "MB/s"
+    scan_interval: 30
+    icon: "mdi:download"
+
+  # Netzwerk-Traffic (Upload)
+  - platform: rest
+    name: "Synology Network TX"
+    resource: "http://192.168.1.200:5000/webapi/entry.cgi"
+    method: POST
+    payload: 'api=SYNO.Core.System.Utilization&version=1&method=get'
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+    value_template: >
+      {% if value_json.success %}
+        {{ (value_json.data.network[0].tx / 1024 / 1024) | round(2) }}
+      {% else %}
+        0
+      {% endif %}
+    unit_of_measurement: "MB/s"
+    scan_interval: 30
+    icon: "mdi:upload"
+
+# Storage/Volume Information
+  - platform: rest
+    name: "Synology Storage Info"
+    resource: "http://192.168.1.200:5000/webapi/entry.cgi"
+    method: POST
+    payload: 'api=SYNO.Storage.CGI.Storage&version=1&method=load_info'
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+    value_template: >
+      {% if value_json.success and value_json.data.volumes %}
+        {{ value_json.data.volumes | length }}
+      {% else %}
+        0
+      {% endif %}
+    unit_of_measurement: "Volumes"
+    json_attributes_path: "$.data.volumes[0]"
+    json_attributes:
+      - size_total
+      - size_used
+      - size_free
+      - status
+      - fs_type
+    scan_interval: 300
+
+  # Festplatten-Status
+  - platform: rest
+    name: "Synology Disk Info"
+    resource: "http://192.168.1.200:5000/webapi/entry.cgi"
+    method: POST
+    payload: 'api=SYNO.Storage.CGI.HDD&version=1&method=list'
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+    value_template: >
+      {% if value_json.success and value_json.data.disks %}
+        {{ value_json.data.disks | selectattr('status', 'equalto', 'normal') | list | length }}
+      {% else %}
+        0
+      {% endif %}
+    unit_of_measurement: "OK"
+    json_attributes_path: "$.data.disks"
+    json_attributes:
+      - id
+      - model
+      - serial
+      - status
+      - temp
+      - size_total
+    scan_interval: 600
+
+# SNMP-basierte Sensoren (Alternative/Ergänzung)
+  # System Uptime via SNMP
+  - platform: snmp
+    host: 192.168.1.200
+    community: public
+    baseoid: 1.3.6.1.2.1.1.3.0
+    name: "Synology Uptime SNMP"
+    unit_of_measurement: "Tage"
+    value_template: "{{ (value | int / 8640000) | round(1) }}"
+    scan_interval: 3600
+
+  # Temperatur via SNMP
+  - platform: snmp
+    host: 192.168.1.200
+    community: public
+    baseoid: 1.3.6.1.4.1.6574.1.2.0
+    name: "Synology Temperature SNMP"
+    unit_of_measurement: "°C"
+    scan_interval: 300
+    device_class: temperature
+
+  # Power Status via SNMP
+  - platform: snmp
+    host: 192.168.1.200
+    community: public
+    baseoid: 1.3.6.1.4.1.6574.1.3.0
+    name: "Synology Power Status SNMP"
+    scan_interval: 300
+
+# DSM Services Status
+  - platform: rest
+    name: "Synology DSM Services"
+    resource: "http://192.168.1.200:5000/webapi/entry.cgi"
+    method: POST
+    payload: 'api=SYNO.Core.Service&version=1&method=get'
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+    value_template: >
+      {% if value_json.success and value_json.data.services %}
+        {{ value_json.data.services | selectattr('enable', 'equalto', true) | selectattr('status', 'equalto', 'running') | list | length }}
+      {% else %}
+        0
+      {% endif %}
+    unit_of_measurement: "Services"
+    json_attributes_path: "$.data.services"
+    json_attributes:
+      - service
+      - display_name
+      - enable
+      - status
+    scan_interval: 300
+
+# Download Station Status (falls installiert)
+  - platform: rest
+    name: "Synology Download Station"
+    resource: "http://192.168.1.200:5000/webapi/entry.cgi"
+    method: POST
+    payload: 'api=SYNO.DownloadStation.Info&version=1&method=getinfo'
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+    value_template: >
+      {% if value_json.success %}
+        {{ value_json.data.version_string }}
+      {% else %}
+        "Nicht verfügbar"
+      {% endif %}
+    scan_interval: 3600
+
+  - platform: rest
+    name: "Synology Active Downloads"
+    resource: "http://192.168.1.200:5000/webapi/entry.cgi"
+    method: POST
+    payload: 'api=SYNO.DownloadStation.Task&version=1&method=list'
+    headers:
+      Content-Type: application/x-www-form-urlencoded
+    value_template: >
+      {% if value_json.success and value_json.data.tasks %}
+        {{ value_json.data.tasks | selectattr('status', 'equalto', 'downloading') | list | length }}
+      {% else %}
+        0
+      {% endif %}
+    unit_of_measurement: "Downloads"
+    scan_interval: 120
+
+# Template-Sensoren für benutzerfreundliche Darstellung
+  - platform: template
+    sensors:
+      synology_disk_usage_percent:
+        friendly_name: "Synology Speicher Nutzung"
+        unit_of_measurement: "%"
+        value_template: >
+          {% set total = state_attr('sensor.synology_storage_info', 'size_total') %}
+          {% set used = state_attr('sensor.synology_storage_info', 'size_used') %}
+          {% if total and used %}
+            {{ (used * 100 / total) | round(1) }}
+          {% else %}
+            0
+          {% endif %}
+        icon_template: >
+          {% set usage = states('sensor.synology_disk_usage_percent') | float %}
+          {% if usage < 70 %}mdi:harddisk
+          {% elif usage < 85 %}mdi:harddisk-plus
+          {% else %}mdi:harddisk-remove
+          {% endif %}
+
+      synology_disk_free_gb:
+        friendly_name: "Synology Freier Speicher"
+        unit_of_measurement: "GB"
+        value_template: >
+          {% set free = state_attr('sensor.synology_storage_info', 'size_free') %}
+          {% if free %}
+            {{ (free / 1024 / 1024 / 1024) | round(1) }}
+          {% else %}
+            0
+          {% endif %}
+
+      synology_system_status:
+        friendly_name: "Synology System Status"
+        value_template: >
+          {% set cpu = states('sensor.synology_cpu_usage') | float %}
+          {% set ram = states('sensor.synology_memory_usage') | float %}
+          {% set disk = states('sensor.synology_disk_usage_percent') | float %}
+          {% if cpu < 70 and ram < 80 and disk < 85 %}
+            Normal
+          {% elif cpu < 90 and ram < 95 and disk < 95 %}
+            Warnung
+          {% else %}
+            Kritisch
+          {% endif %}
+        icon_template: >
+          {% set status = states('sensor.synology_system_status') %}
+          {% if status == 'Normal' %}mdi:check-circle
+          {% elif status == 'Warnung' %}mdi:alert-circle
+          {% else %}mdi:alert-octagon
+          {% endif %}
+
+      synology_healthy_disks:
+        friendly_name: "Synology Gesunde Festplatten"
+        value_template: >
+          {% set disks = state_attr('sensor.synology_disk_info', 'id') %}
+          {% set status = state_attr('sensor.synology_disk_info', 'status') %}
+          {% if disks and status %}
+            {{ status | select('equalto', 'normal') | list | length }} / {{ disks | length }}
+          {% else %}
+            "Unbekannt"
+          {% endif %}
+        icon_template: "mdi:harddisk"
+
+# Binäre Sensoren für Alarme
+binary_sensor:
+  - platform: template
+    sensors:
+      synology_high_cpu_usage:
+        friendly_name: "Synology Hohe CPU Last"
+        value_template: "{{ states('sensor.synology_cpu_usage') | float > 80 }}"
+        device_class: problem
+        delay_on: "00:05:00"
+
+      synology_high_memory_usage:
+        friendly_name: "Synology Hoher Speicherverbrauch"
+        value_template: "{{ states('sensor.synology_memory_usage') | float > 90 }}"
+        device_class: problem
+        delay_on: "00:02:00"
+
+      synology_low_disk_space:
+        friendly_name: "Synology Wenig Speicherplatz"
+        value_template: "{{ states('sensor.synology_disk_usage_percent') | float > 85 }}"
+        device_class: problem
+        delay_on: "01:00:00"
+
+      synology_disk_failure:
+        friendly_name: "Synology Festplatten-Problem"
+        value_template: >
+          {% set status_list = state_attr('sensor.synology_disk_info', 'status') %}
+          {% if status_list %}
+            {{ 'normal' not in status_list or 'abnormal' in status_list or 'not_initialized' in status_list }}
+          {% else %}
+            false
+          {% endif %}
+        device_class: problem
+
+      synology_high_temperature:
+        friendly_name: "Synology Überhitzung"
+        value_template: "{{ states('sensor.synology_temperature_snmp') | float > 65 }}"
+        device_class: heat
+        delay_on: "00:10:00"
+
+      synology_offline:
+        friendly_name: "Synology Offline"
+        value_template: "{{ states('sensor.synology_system_info') == 'Offline' }}"
+        device_class: connectivity
+        delay_on: "00:05:00"
+
+# Automatisierungen für NAS-Monitoring
+automation:
+  - alias: "Synology Kritischer Speicher"
+    trigger:
+      platform: state
+      entity_id: binary_sensor.synology_low_disk_space
+      to: "on"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "💾 Synology Speicher knapp"
+          message: >
+            Nur noch {{ states('sensor.synology_disk_free_gb') }}GB frei 
+            ({{ states('sensor.synology_disk_usage_percent') }}% belegt)
+          data:
+            tag: "nas_storage"
+            actions:
+              - action: "cleanup_nas"
+                title: "Aufräumen"
+
+  - alias: "Synology Festplatten-Alarm"
+    trigger:
+      platform: state
+      entity_id: binary_sensor.synology_disk_failure
+      to: "on"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "🚨 Synology Festplatten-Problem"
+          message: "Festplatte defekt oder nicht initialisiert!"
+          data:
+            tag: "nas_disk_failure"
+            color: "red"
+            sound: "alarm.wav"
+
+  - alias: "Synology Offline Alarm"
+    trigger:
+      platform: state
+      entity_id: binary_sensor.synology_offline
+      to: "on"
+      for: "00:05:00"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "📡 Synology nicht erreichbar"
+          message: "NAS ist offline oder nicht ansprechbar"
+          data:
+            tag: "nas_offline"
+
+  - alias: "Synology Hohe Temperatur"
+    trigger:
+      platform: state
+      entity_id: binary_sensor.synology_high_temperature
+      to: "on"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "🌡️ Synology Überhitzung"
+          message: "Temperatur: {{ states('sensor.synology_temperature_snmp') }}°C"
+
+  - alias: "Synology Download abgeschlossen"
+    trigger:
+      platform: state
+      entity_id: sensor.synology_active_downloads
+      to: "0"
+    condition:
+      condition: template
+      value_template: >
+        {{ trigger.from_state.state | int > 0 }}
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "⬇️ Download abgeschlossen"
+          message: "Alle Downloads auf der Synology beendet"
+
+  - alias: "Synology Täglicher Status"
+    trigger:
+      platform: time
+      at: "08:00:00"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "📊 Synology Tagesbericht"
+          message: >
+            Status: {{ states('sensor.synology_system_status') }}
+            CPU: {{ states('sensor.synology_cpu_usage') }}%
+            RAM: {{ states('sensor.synology_memory_usage') }}%
+            Speicher: {{ states('sensor.synology_disk_usage_percent') }}% 
+            ({{ states('sensor.synology_disk_free_gb') }}GB frei)
+            Festplatten: {{ states('sensor.synology_healthy_disks') }}
+
+# Scripts für NAS-Management
+script:
+  synology_cleanup:
+    alias: "Synology Aufräumen"
+    sequence:
+      - service: notify.persistent_notification
+        data:
+          title: "NAS Cleanup"
+          message: "Automatische Bereinigung wird ausgeführt..."
+      # Hier könnten weitere Aktionen wie Log-Rotation etc. stehen
+      - service: notify.mobile_app
+        data:
+          title: "🧹 Cleanup gestartet"
+          message: "Synology wird aufgeräumt"
+
+  synology_restart_services:
+    alias: "Synology Services neustarten"
+    sequence:
+      - service: notify.mobile_app
+        data:
+          title: "🔄 Services werden neugestartet"
+          message: "Synology Services werden neu gestartet"
+
+# Input Helper für Konfiguration
+input_boolean:
+  synology_monitoring_enabled:
+    name: "Synology Monitoring aktiviert"
+    initial: true
+    icon: "mdi:nas"
+
+  synology_critical_alerts:
+    name: "Kritische NAS Alarme"
+    initial: true
+    icon: "mdi:alert-octagon"
+
+input_number:
+  synology_storage_threshold:
+    name: "Speicher Alarm Schwelle"
+    min: 70
+    max: 95
+    step: 5
+    initial: 85
+    unit_of_measurement: "%"
+    icon: "mdi:harddisk"
+
+  synology_temp_threshold:
+    name: "Temperatur Alarm Schwelle"
+    min: 50
+    max: 80
+    step: 5
+    initial: 65
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer"
+
+# Utility Meter für Netzwerk-Statistiken
+utility_meter:
+  synology_network_daily:
+    source: sensor.synology_network_rx
+    cycle: daily
+    name: "Synology Traffic täglich"
+
+  synology_network_monthly:
+    source: sensor.synology_network_rx
+    cycle: monthly
+    name: "Synology Traffic monatlich"

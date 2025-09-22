@@ -1,0 +1,14 @@
+# Dallas One-Wire Bus für Temperatursensoren
+dallas:
+  - pin: GPIO4
+    update_interval: 10s
+
+sensor:
+  # Beispiel: DS18B20 Temperatursensor
+  - platform: dallas
+    address: 0x1c0000031edd2a28  # Durch deine Sensor-Adresse ersetzen
+    name: "${friendly_name} Temperature"
+    resolution: 12
+    update_interval: 10s
+    filters:
+      - offset: 0.0  # Kalibrierung

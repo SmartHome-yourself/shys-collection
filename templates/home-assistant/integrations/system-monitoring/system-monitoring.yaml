@@ -1,0 +1,356 @@
+# System Monitoring Integration
+# Überwacht Raspberry Pi, Server und UPS-Status über Command Line und SSH
+
+# Command Line Sensoren für lokales System
+sensor:
+  # CPU Temperatur (Raspberry Pi)
+  - platform: command_line
+    name: "RPi CPU Temperature"
+    command: 'cat /sys/class/thermal/thermal_zone0/temp'
+    unit_of_measurement: "°C"
+    value_template: "{{ value | multiply(0.001) | round(1) }}"
+    scan_interval: 60
+    icon: "mdi:thermometer"
+
+  # CPU Auslastung
+  - platform: command_line
+    name: "RPi CPU Usage"
+    command: "top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | cut -d'%' -f1"
+    unit_of_measurement: "%"
+    value_template: "{{ value | float | round(1) }}"
+    scan_interval: 30
+    icon: "mdi:cpu-64-bit"
+
+  # RAM Verwendung
+  - platform: command_line
+    name: "RPi Memory Usage"
+    command: "free | grep Mem | awk '{printf \"%.1f\", $3/$2 * 100.0}'"
+    unit_of_measurement: "%"
+    scan_interval: 60
+    icon: "mdi:memory"
+
+  # Festplatten-Nutzung
+  - platform: command_line
+    name: "RPi Disk Usage"
+    command: "df -h / | awk 'NR==2{print $5}' | cut -d'%' -f1"
+    unit_of_measurement: "%"
+    scan_interval: 300
+    icon: "mdi:harddisk"
+
+  # Freier Speicher in GB
+  - platform: command_line
+    name: "RPi Disk Free"
+    command: "df -BG / | awk 'NR==2{print $4}' | cut -d'G' -f1"
+    unit_of_measurement: "GB"
+    scan_interval: 300
+    icon: "mdi:harddisk"
+
+  # Uptime in Tagen
+  - platform: command_line
+    name: "RPi Uptime"
+    command: "awk '{print int($1/86400)}' /proc/uptime"
+    unit_of_measurement: "Tage"
+    scan_interval: 3600
+    icon: "mdi:clock-outline"
+
+  # Load Average
+  - platform: command_line
+    name: "RPi Load Average"
+    command: "uptime | awk -F'load average:' '{print $2}' | awk '{print $1}' | cut -d',' -f1"
+    scan_interval: 60
+    icon: "mdi:gauge"
+
+  # Netzwerk Traffic (Download MB/s)
+  - platform: command_line
+    name: "RPi Network Download"
+    command: "cat /sys/class/net/eth0/statistics/rx_bytes"
+    scan_interval: 10
+    value_template: >
+      {% if states('sensor.rpi_network_download') != 'unknown' %}
+        {% set prev = states('sensor.rpi_network_download') | float %}
+        {% set curr = value | float %}
+        {% if curr > prev %}
+          {{ ((curr - prev) / (1024*1024) / 10) | round(2) }}
+        {% else %}
+          0
+        {% endif %}
+      {% else %}
+        0
+      {% endif %}
+    unit_of_measurement: "MB/s"
+    icon: "mdi:download"
+
+# UPS Monitoring (für APC UPS über apcupsd)
+  - platform: command_line
+    name: "UPS Status"
+    command: 'apcaccess status | grep "STATUS" | cut -d":" -f2 | xargs'
+    scan_interval: 60
+    icon: "mdi:battery-charging"
+
+  - platform: command_line
+    name: "UPS Battery Level"
+    command: 'apcaccess status | grep "BCHARGE" | cut -d":" -f2 | cut -d" " -f2'
+    unit_of_measurement: "%"
+    scan_interval: 60
+    device_class: battery
+    icon: "mdi:battery"
+
+  - platform: command_line
+    name: "UPS Load"
+    command: 'apcaccess status | grep "LOADPCT" | cut -d":" -f2 | cut -d" " -f2'
+    unit_of_measurement: "%"
+    scan_interval: 60
+    icon: "mdi:flash"
+
+  - platform: command_line
+    name: "UPS Time Left"
+    command: 'apcaccess status | grep "TIMELEFT" | cut -d":" -f2 | cut -d" " -f2'
+    unit_of_measurement: "min"
+    scan_interval: 60
+    icon: "mdi:timer"
+
+# Internet Speed Test (einmal täglich)
+  - platform: command_line
+    name: "Internet Speed Download"
+    command: 'speedtest-cli --simple | grep "Download" | cut -d" " -f2'
+    unit_of_measurement: "Mbit/s"
+    scan_interval: 86400  # Einmal am Tag
+    icon: "mdi:speedometer"
+
+  - platform: command_line
+    name: "Internet Speed Upload"
+    command: 'speedtest-cli --simple | grep "Upload" | cut -d" " -f2'
+    unit_of_measurement: "Mbit/s"
+    scan_interval: 86400
+    icon: "mdi:upload"
+
+# SSH-basierte Remote Server Überwachung
+  - platform: command_line
+    name: "Server CPU Temperature"
+    command: 'ssh user@192.168.1.100 "cat /sys/class/thermal/thermal_zone0/temp"'
+    unit_of_measurement: "°C"
+    value_template: "{{ value | multiply(0.001) | round(1) }}"
+    scan_interval: 300
+    icon: "mdi:thermometer"
+
+  - platform: command_line
+    name: "Server Disk Usage"
+    command: 'ssh user@192.168.1.100 "df -h / | awk '\''NR==2{print \$5}'\'' | cut -d'\''%'\'' -f1"'
+    unit_of_measurement: "%"
+    scan_interval: 600
+    icon: "mdi:harddisk"
+
+# Docker Container Monitoring
+  - platform: command_line
+    name: "Docker Containers Running"
+    command: 'docker ps -q | wc -l'
+    scan_interval: 120
+    icon: "mdi:docker"
+
+  - platform: command_line
+    name: "Docker Containers Total"
+    command: 'docker ps -a -q | wc -l'
+    scan_interval: 300
+    icon: "mdi:docker"
+
+# Home Assistant eigene Statistiken
+  - platform: command_line
+    name: "HA Database Size"
+    command: 'du -sh /config/home-assistant_v2.db | cut -f1'
+    scan_interval: 3600
+    icon: "mdi:database"
+
+  - platform: command_line
+    name: "HA Log Size"
+    command: 'du -sh /config/home-assistant.log | cut -f1'
+    scan_interval: 1800
+    icon: "mdi:file-document"
+
+# Template Sensoren für erweiterte Berechnungen
+  - platform: template
+    sensors:
+      rpi_cpu_temperature_status:
+        friendly_name: "RPi CPU Status"
+        value_template: >
+          {% set temp = states('sensor.rpi_cpu_temperature') | float %}
+          {% if temp < 50 %}Normal
+          {% elif temp < 65 %}Warm
+          {% elif temp < 80 %}Heiß
+          {% else %}Kritisch
+          {% endif %}
+        icon_template: >
+          {% set temp = states('sensor.rpi_cpu_temperature') | float %}
+          {% if temp < 50 %}mdi:thermometer-low
+          {% elif temp < 65 %}mdi:thermometer
+          {% elif temp < 80 %}mdi:thermometer-high
+          {% else %}mdi:thermometer-alert
+          {% endif %}
+
+      system_health_score:
+        friendly_name: "System Health Score"
+        unit_of_measurement: "%"
+        value_template: >
+          {% set cpu_temp = states('sensor.rpi_cpu_temperature') | float %}
+          {% set cpu_usage = states('sensor.rpi_cpu_usage') | float %}
+          {% set mem_usage = states('sensor.rpi_memory_usage') | float %}
+          {% set disk_usage = states('sensor.rpi_disk_usage') | float %}
+          
+          {% set temp_score = 100 - ((cpu_temp - 30) * 2) if cpu_temp > 30 else 100 %}
+          {% set cpu_score = 100 - cpu_usage %}
+          {% set mem_score = 100 - mem_usage %}
+          {% set disk_score = 100 - disk_usage %}
+          
+          {{ ((temp_score + cpu_score + mem_score + disk_score) / 4) | round(0) }}
+        icon_template: >
+          {% set score = states('sensor.system_health_score') | float %}
+          {% if score > 80 %}mdi:heart
+          {% elif score > 60 %}mdi:heart-half
+          {% else %}mdi:heart-broken
+          {% endif %}
+
+# Binäre Sensoren für Alarme
+binary_sensor:
+  - platform: template
+    sensors:
+      rpi_high_temperature:
+        friendly_name: "RPi Überhitzung"
+        value_template: "{{ states('sensor.rpi_cpu_temperature') | float > 70 }}"
+        device_class: heat
+        delay_on: "00:02:00"
+
+      rpi_high_cpu_usage:
+        friendly_name: "RPi Hohe CPU Last"
+        value_template: "{{ states('sensor.rpi_cpu_usage') | float > 80 }}"
+        delay_on: "00:05:00"
+
+      rpi_low_disk_space:
+        friendly_name: "RPi Wenig Speicher"
+        value_template: "{{ states('sensor.rpi_disk_usage') | float > 85 }}"
+        device_class: problem
+        delay_on: "00:30:00"
+
+      ups_battery_low:
+        friendly_name: "UPS Batterie schwach"
+        value_template: "{{ states('sensor.ups_battery_level') | float < 20 }}"
+        device_class: battery
+        delay_on: "00:02:00"
+
+      ups_on_battery:
+        friendly_name: "UPS im Batteriebetrieb"
+        value_template: "{{ states('sensor.ups_status') == 'ONBATT' }}"
+        device_class: power
+        delay_on: "00:00:30"
+
+      internet_slow:
+        friendly_name: "Langsames Internet"
+        value_template: "{{ states('sensor.internet_speed_download') | float < 25 }}"
+        delay_on: "00:10:00"
+
+# Automatisierungen für System-Alerts
+automation:
+  - alias: "System Überhitzung Warnung"
+    trigger:
+      platform: state
+      entity_id: binary_sensor.rpi_high_temperature
+      to: "on"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "🌡️ System Überhitzung"
+          message: "RPi CPU: {{ states('sensor.rpi_cpu_temperature') }}°C"
+          data:
+            tag: "system_temp"
+            color: "red"
+
+  - alias: "UPS Stromausfall"
+    trigger:
+      platform: state
+      entity_id: binary_sensor.ups_on_battery
+      to: "on"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "⚡ Stromausfall erkannt"
+          message: "UPS im Batteriebetrieb - {{ states('sensor.ups_time_left') }} min verbleibend"
+          data:
+            tag: "power_outage"
+            color: "red"
+            sound: "alarm.wav"
+
+  - alias: "Wenig Speicherplatz"
+    trigger:
+      platform: state
+      entity_id: binary_sensor.rpi_low_disk_space
+      to: "on"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "💾 Speicher knapp"
+          message: "Nur noch {{ states('sensor.rpi_disk_free') }}GB frei ({{ states('sensor.rpi_disk_usage') }}% belegt)"
+
+  - alias: "System Health Check"
+    trigger:
+      platform: time
+      at: "09:00:00"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "📊 Täglicher System Report"
+          message: >
+            Health Score: {{ states('sensor.system_health_score') }}%
+            CPU: {{ states('sensor.rpi_cpu_temperature') }}°C
+            Uptime: {{ states('sensor.rpi_uptime') }} Tage
+            UPS: {{ states('sensor.ups_battery_level') }}%
+
+# Script für manuellen Speed Test
+script:
+  run_speed_test:
+    alias: "Internet Speed Test starten"
+    sequence:
+      - service: notify.persistent_notification
+        data:
+          title: "Speed Test"
+          message: "Internet Speed Test wird durchgeführt..."
+      - service: homeassistant.update_entity
+        target:
+          entity_id: 
+            - sensor.internet_speed_download
+            - sensor.internet_speed_upload
+      - delay: 60
+      - service: notify.mobile_app
+        data:
+          title: "🌐 Speed Test Ergebnis"
+          message: >
+            Download: {{ states('sensor.internet_speed_download') }} Mbit/s
+            Upload: {{ states('sensor.internet_speed_upload') }} Mbit/s
+
+# Input Helper für Konfiguration
+input_number:
+  system_alert_cpu_threshold:
+    name: "CPU Alarm Schwelle"
+    min: 60
+    max: 95
+    step: 5
+    initial: 80
+    unit_of_measurement: "%"
+    icon: "mdi:cpu-64-bit"
+
+  system_alert_temp_threshold:
+    name: "Temperatur Alarm Schwelle"
+    min: 60
+    max: 85
+    step: 1
+    initial: 70
+    unit_of_measurement: "°C"
+    icon: "mdi:thermometer"
+
+input_boolean:
+  system_monitoring_enabled:
+    name: "System Monitoring aktiviert"
+    initial: true
+    icon: "mdi:monitor-dashboard"
+
+  system_notifications_enabled:
+    name: "System Benachrichtigungen"
+    initial: true
+    icon: "mdi:bell"

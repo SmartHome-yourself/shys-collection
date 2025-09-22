@@ -1,0 +1,81 @@
+# WiFi mit Fallback Access Point
+# Erstellt einen Fallback-Hotspot bei WiFi-Verbindungsproblemen
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  
+  # Statische IP-Konfiguration (optional)
+  # manual_ip:
+  #   static_ip: 192.168.1.100
+  #   gateway: 192.168.1.1
+  #   subnet: 255.255.255.0
+  #   dns1: 8.8.8.8
+  #   dns2: 8.8.4.4
+  
+  # Energiesparmodus (reduziert Stromverbrauch)
+  power_save_mode: light  # none, light, high
+  
+  # Schnelle Verbindung (Scannen überspringen, gespeicherte Verbindungsinfo nutzen)
+  fast_connect: true
+  
+  # Domäne für mDNS
+  domain: .local
+  
+  # Neustart bei zu langer WiFi-Trennung
+  reboot_timeout: 10min
+  
+  # Fallback Access Point
+  ap:
+    ssid: "${friendly_name} Fallback"
+    password: !secret ap_password
+    # Optional: Eigener Kanal und versteckte SSID
+    # channel: 6
+    # hidden: false
+
+# Captive Portal für einfache Konfiguration
+captive_portal:
+
+# WiFi-Status Sensor (optional)
+sensor:
+  - platform: wifi_signal
+    name: "${friendly_name} WiFi Signal"
+    id: wifi_signal_db
+    update_interval: 60s
+    entity_category: diagnostic
+
+# WiFi-Status Text-Sensor (optional)
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${friendly_name} IP Address"
+      icon: "mdi:ip-network"
+      entity_category: diagnostic
+    ssid:
+      name: "${friendly_name} Connected SSID"
+      icon: "mdi:wifi"
+      entity_category: diagnostic
+    bssid:
+      name: "${friendly_name} Connected BSSID"
+      entity_category: diagnostic
+    mac_address:
+      name: "${friendly_name} MAC Address"
+      icon: "mdi:identifier"
+      entity_category: diagnostic
+    scan_results:
+      name: "${friendly_name} Latest Scan Results"
+      entity_category: diagnostic
+
+# WiFi-Verbindungsstatus Binärsensor
+binary_sensor:
+  - platform: status
+    name: "${friendly_name} Status"
+    id: device_status
+    entity_category: diagnostic
+    device_class: connectivity
+
+# Button zum Neustart der WiFi-Verbindung
+button:
+  - platform: restart
+    name: "${friendly_name} Restart"
+    entity_category: diagnostic
+    icon: "mdi:restart"

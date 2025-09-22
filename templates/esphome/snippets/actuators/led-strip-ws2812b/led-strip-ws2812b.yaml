@@ -1,0 +1,91 @@
+# WS2812B/NeoPixel LED Strip
+# Adressierbare RGB LED-Streifen Steuerung
+light:
+  - platform: neopixelbus
+    type: GRB  # Farbreihenfolge - anpassen falls Farben falsch (RGB, GRB, GRBW)
+    variant: WS2812  # WS2812, WS2812X, WS2813, SK6812, etc.
+    pin: GPIO5
+    num_leds: 30  # Anzahl LEDs in deinem Strip
+    name: "${friendly_name} LED Strip"
+    id: led_strip
+    default_transition_length: 1s
+    gamma_correct: 2.8  # Bessere Farbdarstellung
+    color_correct: [30%, 30%, 30%]  # Helligkeit reduzieren, pro Kanal anpassen
+    restore_mode: RESTORE_DEFAULT_OFF
+    effects:
+      # Basis-Effekte
+      - random:
+          name: "Random"
+          transition_length: 5s
+          update_interval: 7s
+      - strobe:
+          name: "Strobe"
+          colors:
+            - state: true
+              brightness: 100%
+              red: 100%
+              green: 100%
+              blue: 100%
+              duration: 500ms
+            - state: false
+              duration: 250ms
+      - flicker:
+          name: "Flicker"
+          alpha: 95%
+          intensity: 1.5%
+      
+      # Regenbogen-Effekte
+      - rainbow:
+          name: "Rainbow"
+          speed: 10
+          width: 50
+      - pulse:
+          name: "Pulse"
+          transition_length: 1s
+          update_interval: 1s
+          min_brightness: 0%
+          max_brightness: 100%
+      
+      # Erweiterte Effekte
+      - lambda:
+          name: "Fire"
+          update_interval: 50ms
+          lambda: |-
+            static int pos = 0;
+            for (int i = 0; i < it.size(); i++) {
+              int heat = random(50) + random(80);
+              int r = heat;
+              int g = heat / 3;
+              int b = 0;
+              it[i] = Color(r, g, b);
+            }
+
+# Stromverbrauch-Überwachung (optional - für Sicherheit)
+sensor:
+  - platform: template
+    name: "${friendly_name} LED Power Usage"
+    id: led_power_usage
+    unit_of_measurement: "W"
+    accuracy_decimals: 1
+    device_class: power
+    state_class: measurement
+    update_interval: 30s
+    lambda: |-
+      // Grobe Schätzung: ~60mA pro LED bei vollem Weiß
+      float current_per_led = 0.06;  // 60mA
+      float voltage = 5.0;
+      float num_leds = 30;
+      
+      auto call = id(led_strip).get_current_values();
+      float brightness = call.get_brightness();
+      
+      return num_leds * current_per_led * voltage * brightness;
+
+# Sicherheits-Button zum sofortigen Ausschalten
+button:
+  - platform: template
+    name: "${friendly_name} LED Emergency Off"
+    icon: "mdi:lightbulb-off"
+    on_press:
+      - light.turn_off:
+          id: led_strip

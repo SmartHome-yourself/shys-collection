@@ -1,0 +1,39 @@
+# BME280 Sensor (Temperatur, Luftfeuchtigkeit, Luftdruck)
+# Benötigt I²C-Verbindung - korrekte Verkabelung und Pullups sicherstellen
+sensor:
+  - platform: bme280
+    temperature:
+      name: "${friendly_name} Temperature"
+      id: bme280_temperature
+      unit_of_measurement: "°C"
+      accuracy_decimals: 1
+      device_class: temperature
+      state_class: measurement
+      filters:
+        - offset: 0.0  # Kalibrierungs-Offset
+    pressure:
+      name: "${friendly_name} Pressure"
+      id: bme280_pressure
+      unit_of_measurement: "hPa"
+      accuracy_decimals: 1
+      device_class: atmospheric_pressure
+      state_class: measurement
+      filters:
+        - offset: 0.0  # Kalibrierungs-Offset
+    humidity:
+      name: "${friendly_name} Humidity"
+      id: bme280_humidity
+      unit_of_measurement: "%"
+      accuracy_decimals: 1
+      device_class: humidity
+      state_class: measurement
+      filters:
+        - offset: 0.0  # Kalibrierungs-Offset
+    address: 0x76  # Standard-Adresse, manche Module nutzen 0x77
+    update_interval: 60s
+
+# Benötigte I²C-Konfiguration (zur Haupt-Config hinzufügen falls nicht vorhanden)
+# i2c:
+#   sda: GPIO21  # Pins für dein Board anpassen
+#   scl: GPIO22
+#   scan: true

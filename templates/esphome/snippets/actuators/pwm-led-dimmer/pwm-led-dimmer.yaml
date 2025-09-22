@@ -1,0 +1,101 @@
+# PWM LED Dimmer
+# Steuert einfarbige LEDs oder LED-Streifen über PWM
+output:
+  - platform: ledc
+    pin: GPIO5
+    frequency: 1000Hz  # PWM-Frequenz (1kHz verhindert sichtbares Flackern)
+    id: pwm_output
+    channel: 0
+
+light:
+  - platform: monochromatic
+    output: pwm_output
+    name: "${friendly_name} Dimmable Light"
+    id: dimmable_light
+    default_transition_length: 1s
+    gamma_correct: 2.8  # Natürlichere Helligkeitskurve
+    restore_mode: RESTORE_DEFAULT_OFF
+    effects:
+      - pulse:
+          name: "Pulse"
+          transition_length: 1s
+          update_interval: 2s
+          min_brightness: 10%
+          max_brightness: 100%
+      - strobe:
+          name: "Strobe"
+          colors:
+            - state: true
+              brightness: 100%
+              duration: 500ms
+            - state: false
+              duration: 500ms
+      - lambda:
+          name: "Breathing"
+          update_interval: 50ms
+          lambda: |-
+            static uint16_t progress = 0;
+            float brightness = (sin(progress * 0.02) + 1.0) / 2.0;
+            auto call = id(dimmable_light).turn_on();
+            call.set_brightness(brightness);
+            call.perform();
+            progress++;
+
+# Optional: Manuelle Helligkeitssteuerung über Number-Komponente
+number:
+  - platform: template
+    name: "${friendly_name} Brightness"
+    id: manual_brightness
+    min_value: 0
+    max_value: 100
+    initial_value: 50
+    step: 1
+    unit_of_measurement: "%"
+    mode: slider
+    optimistic: true
+    set_action:
+      then:
+        - light.turn_on:
+            id: dimmable_light
+            brightness: !lambda 'return x / 100.0;'
+
+# Optional: Vordefinierte Helligkeits-Buttons
+button:
+  - platform: template
+    name: "${friendly_name} Dim"
+    icon: "mdi:brightness-5"
+    on_press:
+      - light.turn_on:
+          id: dimmable_light
+          brightness: 25%
+
+  - platform: template
+    name: "${friendly_name} Medium"
+    icon: "mdi:brightness-6" 
+    on_press:
+      - light.turn_on:
+          id: dimmable_light
+          brightness: 50%
+
+  - platform: template
+    name: "${friendly_name} Bright"
+    icon: "mdi:brightness-7"
+    on_press:
+      - light.turn_on:
+          id: dimmable_light
+          brightness: 100%
+
+# Optional: Sanftes Ein-/Ausschalten mit Überblendung
+script:
+  - id: smooth_on
+    then:
+      - light.turn_on:
+          id: dimmable_light
+          brightness: 100%
+          transition_length: 2s
+  
+  - id: smooth_off
+    then:
+      - light.turn_off:
+          id: dimmable_light
+          transition_length: 2s

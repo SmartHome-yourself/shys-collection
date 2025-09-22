@@ -1,0 +1,38 @@
+# HC-SR04 Ultraschall Distanzsensor
+# Misst Entfernung mit Ultraschallwellen (2cm - 400cm)
+sensor:
+  - platform: ultrasonic
+    trigger_pin: GPIO5
+    echo_pin: GPIO18
+    name: "${friendly_name} Distance"
+    id: ultrasonic_sensor
+    unit_of_measurement: "cm"
+    accuracy_decimals: 1
+    device_class: distance
+    state_class: measurement
+    update_interval: 5s
+    timeout: 3m  # Maximale Messzeit
+    filters:
+      - filter_out: nan  # Ungültige Messwerte entfernen
+      - median:  # Rauschen reduzieren
+          window_size: 5
+          send_every: 3
+      - lambda: |-
+          // Auf Sensor-Bereich begrenzen (2-400cm)
+          if (x < 2.0 || x > 400.0) {
+            return {};  // Leerwert zurückgeben (gefiltert)
+          }
+          return x;
+
+# Optional: Binärsensor für Näherungserkennung
+binary_sensor:
+  - platform: template
+    name: "${friendly_name} Close Proximity"
+    id: proximity_alert
+    device_class: proximity
+    lambda: |-
+      if (id(ultrasonic_sensor).state < 10.0) {
+        return true;
+      } else {
+        return false;
+      }

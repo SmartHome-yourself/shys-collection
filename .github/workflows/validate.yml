@@ -1,0 +1,26 @@
+name: Setup Pre-commit Hook
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'tools/hooks/**'
+      - '.github/workflows/validate.yml'
+
+jobs:
+  setup-precommit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pre-commit hook
+        run: |
+          echo "Pre-commit Hook Setup:"
+          echo "Für lokale Installation führe aus:"
+          echo ""
+          echo "Windows (PowerShell):"
+          echo "  .\\tools\\hooks\\install.ps1"
+          echo ""
+          echo "Linux/Mac (Bash):"
+          echo "  ./tools/hooks/install.sh"
+          echo ""
+          echo "Der Hook validiert automatisch vor jedem Commit!"

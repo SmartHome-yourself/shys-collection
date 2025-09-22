@@ -1,0 +1,130 @@
+# Wetter-Übersicht Dashboard Card
+# Kombiniert aktuelle Wetterdaten, Vorhersage und Warnungen
+type: vertical-stack
+cards:
+  # Aktuelles Wetter Header
+  - type: horizontal-stack
+    cards:
+      - type: weather-forecast
+        entity: weather.openweathermap
+        forecast_type: daily
+        show_forecast: false
+        style: |
+          ha-card {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+            color: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+          }
+      
+      # Aktuelle Temperaturen
+      - type: vertical-stack
+        cards:
+          - type: sensor
+            entity: sensor.outdoor_temperature
+            name: "Außen"
+            icon: "mdi:thermometer"
+            card_mod:
+              style: |
+                ha-card {
+                  background: rgba(255,255,255,0.1);
+                  color: white;
+                  border-radius: 10px;
+                  text-align: center;
+                }
+          - type: sensor  
+            entity: sensor.indoor_temperature
+            name: "Innen"
+            icon: "mdi:home-thermometer"
+            card_mod:
+              style: |
+                ha-card {
+                  background: rgba(255,255,255,0.1);
+                  color: white;
+                  border-radius: 10px;
+                  text-align: center;
+                }
+
+  # Wetter-Details Horizontal
+  - type: horizontal-stack
+    cards:
+      - type: entities
+        title: "Wetterdaten"
+        entities:
+          - entity: sensor.outdoor_humidity
+            name: "Luftfeuchtigkeit"
+            icon: "mdi:water-percent"
+          - entity: sensor.pressure
+            name: "Luftdruck"
+            icon: "mdi:gauge"
+          - entity: sensor.wind_speed
+            name: "Windgeschwindigkeit"
+            icon: "mdi:weather-windy"
+          - entity: sensor.uv_index
+            name: "UV-Index"
+            icon: "mdi:weather-sunny-alert"
+        card_mod:
+          style: |
+            ha-card {
+              border-radius: 15px;
+              background: var(--card-background-color);
+            }
+
+      # Niederschlag & Sonne
+      - type: entities
+        title: "Niederschlag & Sonne"
+        entities:
+          - entity: sensor.rain_today
+            name: "Regen heute"
+            icon: "mdi:weather-rainy"
+          - entity: sensor.rain_rate
+            name: "Regenrate"
+            icon: "mdi:weather-pouring"
+          - entity: sensor.sun_elevation
+            name: "Sonnenhöhe"
+            icon: "mdi:weather-sunny"
+          - entity: binary_sensor.sun_rising
+            name: "Sonne steigt"
+            icon: "mdi:weather-sunset-up"
+        card_mod:
+          style: |
+            ha-card {
+              border-radius: 15px;
+              background: var(--card-background-color);
+            }
+
+  # 5-Tage Vorhersage
+  - type: weather-forecast
+    entity: weather.openweathermap
+    forecast_type: daily
+    name: "5-Tage Vorhersage"
+    card_mod:
+      style: |
+        ha-card {
+          border-radius: 15px;
+          background: var(--card-background-color);
+        }
+
+  # Wetterwarnungen (falls vorhanden)
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.weather_warning_active
+        state: "on"
+    card:
+      type: markdown
+      content: |
+        ## ⚠️ Wetterwarnungen
+        {{ state_attr('sensor.dwd_weather_warnings', 'warnings') | join('<br>') }}
+      card_mod:
+        style: |
+          ha-card {
+            background: rgba(255, 152, 0, 0.1);
+            border: 2px solid #ff9800;
+            border-radius: 15px;
+          }
+
+  # Regenradar (Optional)
+  - type: iframe
+    url: "https://www.regenradar.de"
+    aspect_ratio: 75%
+    title: "Regenradar"

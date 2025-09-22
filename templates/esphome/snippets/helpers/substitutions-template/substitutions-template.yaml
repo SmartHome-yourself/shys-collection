@@ -1,0 +1,123 @@
+# Standard ESPHome Substitutions Template
+# Macht Konfigurationen wiederverwendbar und einfacher anpassbar
+substitutions:
+  # Geräte-Identifikation
+  device_name: "sensor-device"  # Interner Name (Kleinbuchstaben, keine Leerzeichen)
+  friendly_name: "Sensor Device"  # Anzeigename in Home Assistant
+  device_description: "ESPHome Gerät mit Sensoren und Aktoren"
+  
+  # Hardware-Konfiguration
+  board_type: "esp32dev"  # esp32dev, nodemcuv2, d1_mini, etc.
+  framework_version: "recommended"  # recommended, latest, 5.4.0, etc.
+  
+  # Pin-Zuweisungen (für dein Board anpassen)
+  pin_sda: "GPIO21"  # I²C SDA Pin
+  pin_scl: "GPIO22"  # I²C SCL Pin
+  pin_led: "GPIO2"   # Status-LED Pin
+  pin_button: "GPIO0"  # Boot-Button Pin
+  
+  # Timing-Einstellungen
+  update_interval_fast: "10s"    # Für kritische Sensoren
+  update_interval_normal: "30s"  # Für reguläre Sensoren  
+  update_interval_slow: "60s"    # Für Status-Sensoren
+  
+  # Netzwerk-Einstellungen
+  wifi_fast_connect: "true"
+  wifi_power_save: "light"
+  ap_password: "12345678"  # Fallback AP Passwort (min. 8 Zeichen)
+  
+  # Home Assistant Einstellungen
+  api_encryption_key: !secret api_encryption_key
+  ota_password: !secret ota_password
+  
+  # Hardware-spezifische Einstellungen
+  i2c_scan: "true"
+  log_level: "INFO"  # VERBOSE, DEBUG, INFO, WARN, ERROR
+
+# Basis-Gerätekonfiguration mit Substitutions
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: ${device_description}
+  
+  # Plattform-Konfiguration
+  platform: ESP32
+  board: ${board_type}
+  framework:
+    type: arduino
+    version: ${framework_version}
+
+# WiFi mit Substitutions
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: ${wifi_fast_connect}
+  power_save_mode: ${wifi_power_save}
+  
+  ap:
+    ssid: "${friendly_name} Fallback"
+    password: ${ap_password}
+
+# API mit Verschlüsselung
+api:
+  encryption:
+    key: ${api_encryption_key}
+
+# OTA-Updates
+ota:
+  - platform: esphome
+    password: ${ota_password}
+
+# Protokollierung
+logger:
+  level: ${log_level}
+
+# Status-LED mit Substitution
+status_led:
+  pin:
+    number: ${pin_led}
+    inverted: false
+
+# I²C-Bus mit Substitutions
+i2c:
+  sda: ${pin_sda}
+  scl: ${pin_scl}
+  scan: ${i2c_scan}
+  frequency: 100kHz
+
+# Captive Portal
+captive_portal:
+
+# Beispiel-Sensor mit Substitutions
+sensor:
+  - platform: uptime
+    name: "${friendly_name} Uptime"
+    update_interval: ${update_interval_slow}
+    entity_category: diagnostic
+
+  - platform: wifi_signal
+    name: "${friendly_name} WiFi Signal"
+    update_interval: ${update_interval_slow}
+    entity_category: diagnostic
+
+# Beispiel-Binärsensor mit Substitutions
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: ${pin_button}
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "${friendly_name} Button"
+    id: device_button
+    on_press:
+      - logger.log: "Button pressed!"
+
+  - platform: status
+    name: "${friendly_name} Status"
+    entity_category: diagnostic
+
+# Beispiel-Neustart-Button
+button:
+  - platform: restart
+    name: "${friendly_name} Restart"
+    entity_category: diagnostic

@@ -1,0 +1,8 @@
+"Reference","Value","Footprint","Datasheet","Qty","DNP","Exclude from BOM","Exclude from Board"
+"Bcd1","GM60","Pin_Headers:Pin_Header_Straight_1x04_Pitch2.54mm","","1","","",""
+"Brd1","SSD1306","Pin_Headers:Pin_Header_Straight_1x04_Pitch2.54mm","","1","","",""
+"BZ1","Buzzer","Buzzers_Beepers:Buzzer_12x9.5RM7.6","~","1","","",""
+"J1","Conn_Coaxial_Power","Connectors_Terminal_Blocks:TerminalBlock_Altech_AK300-2_P5.00mm","~","1","","",""
+"J2","0022232041","Pin_Headers:Pin_Header_Straight_1x04_Pitch2.54mm","https://www.molex.com/pdm_docs/sd/022232041_sd.pdf","1","","",""
+"J3","640456-3","Pin_Headers:Pin_Header_Straight_1x03_Pitch2.54mm","https://www.te.com/commerce/DocumentDelivery/DDEController?Action=srchrtrv&DocNm=640456&DocType=Customer+Drawing&DocLang=English","1","","",""
+"U1","mini_esp32","esp32mini:ESP32_mini","","1","","",""

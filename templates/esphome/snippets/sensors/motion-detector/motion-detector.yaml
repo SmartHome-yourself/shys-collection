@@ -1,0 +1,15 @@
+# PIR Motion Sensor
+binary_sensor:
+  - platform: gpio
+    pin: 
+      number: GPIO4
+      mode: INPUT_PULLDOWN
+    name: "${friendly_name} Motion"
+    id: motion_sensor
+    device_class: motion
+    filters:
+      - delayed_on: 50ms   # Entprellen
+      - delayed_off: 5s    # Flackern verhindern
+    on_press:
+      then:
+        - logger.log: "Bewegung erkannt!"

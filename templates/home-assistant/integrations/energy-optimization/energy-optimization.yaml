@@ -1,0 +1,442 @@
+# Energy Optimization Integration
+# Intelligente Energieverteilung und PV-Überschuss-Management
+
+# Basis-Sensoren für Energiebilanz
+sensor:
+  # Aktueller Energieüberschuss (PV - Verbrauch)
+  - platform: template
+    sensors:
+      energy_surplus:
+        friendly_name: "Energie-Überschuss"
+        unit_of_measurement: "W"
+        value_template: >
+          {% set pv_power = states('sensor.solar_power') | float(0) %}
+          {% set house_power = states('sensor.house_consumption') | float(0) %}
+          {{ (pv_power - house_power) | round(0) }}
+        icon_template: >
+          {% if states('sensor.energy_surplus') | float > 500 %}
+            mdi:solar-power
+          {% elif states('sensor.energy_surplus') | float > 0 %}
+            mdi:flash
+          {% else %}
+            mdi:transmission-tower
+          {% endif %}
+
+  # Dynamischer Strompreis (für Tibber/aWATTar)
+  - platform: template
+    sensors:
+      electricity_price_level:
+        friendly_name: "Strompreis-Level"
+        value_template: >
+          {% set price = states('sensor.electricity_price_current') | float(0.30) %}
+          {% if price < 0.20 %}sehr günstig
+          {% elif price < 0.25 %}günstig
+          {% elif price < 0.35 %}normal
+          {% elif price < 0.45 %}teuer
+          {% else %}sehr teuer
+          {% endif %}
+        icon_template: >
+          {% set price = states('sensor.electricity_price_current') | float(0.30) %}
+          {% if price < 0.20 %}mdi:currency-eur-off
+          {% elif price < 0.25 %}mdi:currency-eur
+          {% elif price < 0.35 %}mdi:currency-eur
+          {% elif price < 0.45 %}mdi:alert-circle
+          {% else %}mdi:alert
+          {% endif %}
+
+  # Batteriespeicher Effizienz
+  - platform: template
+    sensors:
+      battery_efficiency:
+        friendly_name: "Batterie Effizienz"
+        unit_of_measurement: "%"
+        value_template: >
+          {% set charge_power = states('sensor.battery_charge_power') | float(0) %}
+          {% set discharge_power = states('sensor.battery_discharge_power') | float(0) %}
+          {% if charge_power > 0 %}
+            {{ ((discharge_power / charge_power) * 100) | round(1) }}
+          {% else %}
+            95
+          {% endif %}
+
+  # Optimaler Geräte-Zeitplan basierend auf PV-Prognose
+  - platform: template
+    sensors:
+      optimal_washing_time:
+        friendly_name: "Optimale Waschzeit"
+        value_template: >
+          {% set now_hour = now().hour %}
+          {% set pv_forecast = state_attr('sensor.pv_forecast_today', 'hourly') %}
+          {% if pv_forecast %}
+            {% set max_pv_hour = pv_forecast.index(pv_forecast | max) + 6 %}
+            {% if max_pv_hour > 23 %}{{ max_pv_hour - 24 }}:00{% else %}{{ max_pv_hour }}:00{% endif %}
+          {% else %}
+            12:00
+          {% endif %}
+
+  # Energiekosten-Prognose für heute
+  - platform: template
+    sensors:
+      energy_cost_forecast:
+        friendly_name: "Energiekosten Prognose"
+        unit_of_measurement: "€"
+        value_template: >
+          {% set base_consumption = 15 %}  # kWh Grundverbrauch
+          {% set pv_generation = states('sensor.pv_forecast_today') | float(0) %}
+          {% set price = states('sensor.electricity_price_current') | float(0.30) %}
+          {% set cost = (base_consumption - pv_generation) * price %}
+          {{ cost | round(2) if cost > 0 else 0 }}
+
+# Geräte-Prioritäten für Überschuss-Management
+input_select:
+  energy_device_priority:
+    name: "Geräte-Priorität bei Überschuss"
+    options:
+      - "Warmwasser > E-Auto > Waschmaschine > Spülmaschine"
+      - "E-Auto > Warmwasser > Waschmaschine > Spülmaschine"  
+      - "Waschmaschine > Warmwasser > E-Auto > Spülmaschine"
+    initial: "Warmwasser > E-Auto > Waschmaschine > Spülmaschine"
+
+# Optimierungs-Modi
+input_select:
+  energy_optimization_mode:
+    name: "Energieoptimierung Modus"
+    options:
+      - "Aus"
+      - "Nur PV-Überschuss"
+      - "Günstige Strompreise"
+      - "Vollautomatisch"
+    initial: "Nur PV-Überschuss"
+
+# Schwellenwerte für Optimierung
+input_number:
+  energy_surplus_threshold:
+    name: "PV-Überschuss Schwelle"
+    min: 500
+    max: 3000
+    step: 100
+    initial: 1000
+    unit_of_measurement: "W"
+    icon: "mdi:solar-power"
+
+  energy_cheap_price_threshold:
+    name: "Günstiger Strompreis Schwelle"
+    min: 0.15
+    max: 0.30
+    step: 0.01
+    initial: 0.22
+    unit_of_measurement: "€/kWh"
+    icon: "mdi:currency-eur"
+
+  battery_min_soc:
+    name: "Mindest-Batterieladung"
+    min: 10
+    max: 50
+    step: 5
+    initial: 20
+    unit_of_measurement: "%"
+    icon: "mdi:battery"
+
+# Boolean-Helper für manuelle Steuerung
+input_boolean:
+  energy_optimization_enabled:
+    name: "Energieoptimierung aktiviert"
+    initial: true
+    icon: "mdi:lightning-bolt"
+
+  force_device_start:
+    name: "Geräte-Start erzwingen"
+    initial: false
+    icon: "mdi:play-circle"
+
+  battery_save_mode:
+    name: "Batterie-Sparmodus"
+    initial: false
+    icon: "mdi:battery-heart"
+
+# Binäre Sensoren für Optimierungs-Bedingungen
+binary_sensor:
+  - platform: template
+    sensors:
+      pv_surplus_available:
+        friendly_name: "PV-Überschuss verfügbar"
+        value_template: >
+          {{ states('sensor.energy_surplus') | float > 
+             states('input_number.energy_surplus_threshold') | float }}
+        delay_on: "00:02:00"
+        delay_off: "00:05:00"
+
+      electricity_price_cheap:
+        friendly_name: "Günstiger Strompreis"
+        value_template: >
+          {{ states('sensor.electricity_price_current') | float < 
+             states('input_number.energy_cheap_price_threshold') | float }}
+
+      battery_needs_charging:
+        friendly_name: "Batterie muss geladen werden"
+        value_template: >
+          {{ states('sensor.battery_soc') | float < 
+             states('input_number.battery_min_soc') | float }}
+        delay_on: "00:10:00"
+
+      optimal_time_window:
+        friendly_name: "Optimales Zeitfenster"
+        value_template: >
+          {% set current_hour = now().hour %}
+          {% set optimal_hour = states('sensor.optimal_washing_time').split(':')[0] | int %}
+          {{ (current_hour >= optimal_hour and current_hour <= optimal_hour + 3) }}
+
+      energy_optimization_conditions_met:
+        friendly_name: "Optimierungs-Bedingungen erfüllt"
+        value_template: >
+          {% set mode = states('input_select.energy_optimization_mode') %}
+          {% if mode == 'Aus' %}
+            false
+          {% elif mode == 'Nur PV-Überschuss' %}
+            {{ is_state('binary_sensor.pv_surplus_available', 'on') }}
+          {% elif mode == 'Günstige Strompreise' %}
+            {{ is_state('binary_sensor.electricity_price_cheap', 'on') }}
+          {% elif mode == 'Vollautomatisch' %}
+            {{ is_state('binary_sensor.pv_surplus_available', 'on') or
+               is_state('binary_sensor.electricity_price_cheap', 'on') or
+               is_state('binary_sensor.optimal_time_window', 'on') }}
+          {% endif %}
+
+# Scripts für Geräte-Management
+script:
+  energy_start_water_heater:
+    alias: "Warmwasser starten"
+    sequence:
+      - condition: template
+        value_template: >
+          {{ states('sensor.water_heater_temperature') | float < 55 }}
+      - service: switch.turn_on
+        target:
+          entity_id: switch.water_heater
+      - service: notify.mobile_app
+        data:
+          title: "🔥 Warmwasser"
+          message: "Warmwasserbereitung gestartet (PV-Überschuss)"
+
+  energy_start_car_charging:
+    alias: "E-Auto laden starten"
+    sequence:
+      - condition: template
+        value_template: >
+          {{ states('sensor.car_battery_level') | float < 80 }}
+      - condition: state
+        entity_id: binary_sensor.car_connected
+        state: "on"
+      - service: switch.turn_on
+        target:
+          entity_id: switch.car_charger
+      - service: notify.mobile_app
+        data:
+          title: "⚡ E-Auto"
+          message: "Laden gestartet ({{ states('sensor.energy_surplus') }}W Überschuss)"
+
+  energy_start_washing_machine:
+    alias: "Waschmaschine starten"
+    sequence:
+      - condition: state
+        entity_id: binary_sensor.washing_machine_ready
+        state: "on"
+      - service: switch.turn_on
+        target:
+          entity_id: switch.washing_machine
+      - service: notify.mobile_app
+        data:
+          title: "👕 Waschmaschine"
+          message: "Waschgang gestartet zur optimalen Zeit"
+
+  energy_start_dishwasher:
+    alias: "Spülmaschine starten"
+    sequence:
+      - condition: state
+        entity_id: binary_sensor.dishwasher_ready
+        state: "on"
+      - service: switch.turn_on
+        target:
+          entity_id: switch.dishwasher
+      - service: notify.mobile_app
+        data:
+          title: "🍽️ Spülmaschine"
+          message: "Spülgang gestartet bei günstigem Strom"
+
+  energy_stop_non_essential:
+    alias: "Nicht-essentielle Geräte stoppen"
+    sequence:
+      - service: switch.turn_off
+        target:
+          entity_id:
+            - switch.pool_pump
+            - switch.garden_irrigation
+            - switch.workshop_heater
+      - service: climate.set_temperature
+        target:
+          entity_id: climate.heat_pump
+        data:
+          temperature: 19  # Temperatur reduzieren
+      - service: notify.mobile_app
+        data:
+          title: "⚡ Energiesparmodus"
+          message: "Nicht-essentielle Verbraucher gestoppt"
+
+# Automatisierungen für intelligente Energieverteilung
+automation:
+  - alias: "PV-Überschuss Management"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.pv_surplus_available
+        to: "on"
+        for: "00:03:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.energy_optimization_enabled
+        state: "on"
+    action:
+      - choose:
+          # Priorität 1: Warmwasser
+          - conditions:
+              - condition: template
+                value_template: >
+                  {{ 'Warmwasser' in states('input_select.energy_device_priority') and
+                     states('sensor.water_heater_temperature') | float < 55 }}
+            sequence:
+              - service: script.energy_start_water_heater
+          
+          # Priorität 2: E-Auto (falls verfügbar)
+          - conditions:
+              - condition: state
+                entity_id: binary_sensor.car_connected
+                state: "on"
+              - condition: template
+                value_template: >
+                  {{ states('sensor.car_battery_level') | float < 80 }}
+            sequence:
+              - service: script.energy_start_car_charging
+          
+          # Priorität 3: Waschmaschine
+          - conditions:
+              - condition: state
+                entity_id: binary_sensor.washing_machine_ready
+                state: "on"
+            sequence:
+              - service: script.energy_start_washing_machine
+        
+        # Fallback: Batterie laden
+        default:
+          - condition: template
+            value_template: >
+              {{ states('sensor.battery_soc') | float < 95 }}
+          - service: script.energy_charge_battery
+
+  - alias: "Teurer Strom - Verbrauch reduzieren"
+    trigger:
+      - platform: template
+        value_template: >
+          {{ states('sensor.electricity_price_current') | float > 0.40 }}
+        for: "00:05:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.energy_optimization_enabled
+        state: "on"
+    action:
+      - service: script.energy_stop_non_essential
+      - service: notify.mobile_app
+        data:
+          title: "💸 Teurer Strom"
+          message: "Aktuell {{ states('sensor.electricity_price_current') }}€/kWh - Verbrauch reduziert"
+
+  - alias: "Batterie-Notladung bei günstigen Preisen"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.electricity_price_cheap
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: binary_sensor.battery_needs_charging
+        state: "on"
+      - condition: time
+        after: "23:00:00"
+        before: "06:00:00"
+    action:
+      - service: switch.turn_on
+        target:
+          entity_id: switch.battery_charger
+      - service: notify.mobile_app
+        data:
+          title: "🔋 Batterie-Notladung"
+          message: "Ladung bei günstigem Nachtstrom ({{ states('sensor.electricity_price_current') }}€/kWh)"
+
+  - alias: "Optimaler Waschzeitpunkt"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.optimal_time_window
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: binary_sensor.washing_machine_ready
+        state: "on"
+      - condition: template
+        value_template: >
+          {{ 'Vollautomatisch' in states('input_select.energy_optimization_mode') }}
+    action:
+      - service: script.energy_start_washing_machine
+
+  - alias: "Energieoptimierung Tagesreport"
+    trigger:
+      platform: time
+      at: "20:00:00"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "📊 Energie-Tagesreport"
+          message: >
+            PV-Ertrag: {{ states('sensor.pv_energy_today') }}kWh
+            Verbrauch: {{ states('sensor.energy_consumption_today') }}kWh
+            Kosten: {{ states('sensor.energy_cost_forecast') }}€
+            Optimierungen: {{ states('counter.energy_optimizations_today') }}
+
+# Counter für Optimierungen
+counter:
+  energy_optimizations_today:
+    name: "Optimierungen heute"
+    initial: 0
+    step: 1
+    icon: "mdi:lightning-bolt-circle"
+
+# Utility Meter für Energiestatistiken
+utility_meter:
+  energy_savings_daily:
+    source: sensor.energy_cost_savings
+    cycle: daily
+    name: "Tägliche Energieeinsparung"
+
+  pv_surplus_utilization_daily:
+    source: sensor.pv_surplus_used
+    cycle: daily
+    name: "Tägliche PV-Überschuss-Nutzung"
+
+# Template für Einsparungsberechnung
+sensor:
+  - platform: template
+    sensors:
+      energy_cost_savings:
+        friendly_name: "Energiekosteneinsparung"
+        unit_of_measurement: "€"
+        value_template: >
+          {% set normal_cost = states('sensor.energy_consumption_today') | float * 0.30 %}
+          {% set actual_cost = states('sensor.energy_cost_today') | float %}
+          {{ (normal_cost - actual_cost) | round(2) if normal_cost > actual_cost else 0 }}
+
+      pv_surplus_used:
+        friendly_name: "Genutzter PV-Überschuss"
+        unit_of_measurement: "kWh"
+        value_template: >
+          {% set surplus = states('sensor.energy_surplus') | float %}
+          {% if surplus > 0 %}
+            {{ (surplus * 0.25 / 1000) | round(2) }}  # 15min Intervall
+          {% else %}
+            0
+          {% endif %}

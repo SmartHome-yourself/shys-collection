@@ -1,0 +1,239 @@
+blueprint:
+  name: "Light with Motionsensor (SmartHome yourself)"
+  description: |
+    Turn on a light, when motion is detected for defined Time.
+    Switch off without motion if timeout reached and no motion for defined time.
+    (Light stays on longer, when manually turned on)
+  domain: automation
+  source_url: https://github.com/SmartHome-yourself/automatic-light-blueprint/blob/main/shys_motion_light.yaml
+
+  # ---------------------------------------------
+  #   Eingabefelder
+  # ---------------------------------------------
+  input:
+    motion_entity:
+      name: "Motion Sensor"
+      description: "The motionsensor to use"
+      selector:
+        entity:
+          domain:
+            - binary_sensor
+          device_class:
+            - motion
+            - presence
+            - occupancy
+          multiple: false
+
+    light_sensor_entity:
+      name: "Light Sensor (optional)"
+      description: "The Light to use"
+      default: []
+      selector:
+        entity:
+          domain:
+          - sensor
+          device_class:
+          - illuminance
+          multiple: false
+
+    lux_limit:
+      name: "Lux-Limit"
+      description: |
+        The limit of lux-value. If value of light-sensor is higher, then don't turn on the light on motion.
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 300
+          unit_of_measurement: "lx"
+
+    light_target:
+      name: Light(s)
+      description: light to use
+      selector:
+        target:
+          entity:
+            domain: light
+
+    all_day:
+      name: Turn on only at night?
+      description: "You can choose, if the light automatically turn on all day or only at night."
+      default: "only at night"
+      selector:
+        select:
+          options:
+            - "switch on all day"
+            - "only at night"
+
+    no_motion_wait:
+      name: "No motion time"
+      description: |
+        Time to leave the light on after last motion is detected.
+        (This time starts counting, when binary_sensor changes to "off")
+      default:
+        minutes: 2
+      selector:
+        duration:
+
+    light_auto_off_after:
+      name: "Light on - timeout"
+      description: |
+        Time after which the light should be switched off,
+        if there has been no movement in the "No motion time" period.
+        (For the case of manual switch on)
+      default:
+        minutes: 5
+      selector:
+        duration:
+
+    default_brightness:
+      name: "Default brightness"
+      description: |
+        The default brightness to set when automatically turn on the light.
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+
+    alternative_period_start:
+      name: "Alternative period begin"
+      description: |
+        Start of the alternative period, when the alternative brightness should be set instead of the default brightness.
+        If you didn't need the alternative period, leave it at 00:00:00
+      default: 00:00:00
+      selector:
+        time:
+
+    alternative_period_end:
+      name: "Alternative period end"
+      description: |
+        End of the alternative period, when the alternative brightness should be set instead of the default brightness.
+        If you didn't need the alternative period, leave it at 00:00:00
+      default: 00:00:00
+      selector:
+        time:
+
+    alternative_brightness:
+      name: "Alternative brightness"
+      description: |
+        The brightness to set when automatically turn on the light in alternative period.
+        If you didn't need the alternative period, leave it at 100%
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+
+# ---------------------------------------------
+#  internals
+# ---------------------------------------------
+mode: restart
+max_exceeded: silent
+
+variables:
+  all_day: !input all_day
+  my_lights: !input light_target
+  default_brightness: !input default_brightness
+  period_start: !input alternative_period_start
+  period_end: !input alternative_period_end
+  alternative_brightness: !input alternative_brightness
+  light_sensor_entity: !input light_sensor_entity
+  lux_limit: !input lux_limit
+  light_sensor_value: >-
+    {% if light_sensor_entity != [] %}
+    {{states(light_sensor_entity) | float(0)}}
+    {% else %}
+    0
+    {% endif %}
+  brightness: >-
+    {% if  ( period_start < period_end and (now() >= today_at(period_start) and now() <= today_at(period_end)) ) or
+           ( period_start > period_end and (now() >= today_at(period_start) or now() <= today_at(period_end)) ) %}
+      {{alternative_brightness}}
+    {% else %}
+      {{default_brightness}}
+    {% endif %}
+
+# ---------------------------------------------
+#  Auslöser
+# ---------------------------------------------
+trigger:
+  - platform: state
+    entity_id: !input motion_entity
+    from: "off"
+    to: "on"
+    id: bewegung
+
+  - platform: state
+    entity_id: !input motion_entity
+    to: "off"
+    for: !input no_motion_wait
+    id: keine_bewegung
+
+  - platform: template
+    value_template: "{{ expand(my_lights.entity_id) | selectattr('state', '==', 'off') | list | count > 0 }}"
+    for: !input light_auto_off_after
+    id: light_on_timeout
+
+condition: []
+
+# ---------------------------------------------
+#  Aktionen
+# ---------------------------------------------
+action:
+  # Licht bei Bewegung einschalten
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: bewegung
+      - condition: template
+        value_template: >-
+          {{ expand(my_lights.entity_id) | selectattr('state', '==', 'off') | list | count > 0 }}
+      - condition: or
+        conditions:
+        - condition: template
+          value_template: >-
+            {{ all_day == 'switch on all day' }}
+        - condition: state
+          entity_id: sun.sun
+          state: below_horizon
+      - condition: template
+        value_template: >-
+          {{ (light_sensor_value | float(0)) < (lux_limit | float(0)) }}
+      sequence:
+      - action: light.turn_on
+        target: !input light_target
+        data:
+          brightness_pct: '{{ brightness }}'
+
+  # Licht ausschalten, wenn für die Dauer von {{no_motion_wait}}
+  # keine Bewegung stattgefunden hat.
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: keine_bewegung
+      - condition: template
+        value_template: >-
+          {{ expand(my_lights.entity_id) | selectattr('state', '==', 'on') | list | count > 0 }}
+      sequence:
+      - action: light.turn_off
+        target: !input light_target
+
+  # Licht nach der Dauer von {{light_auto_off_after}} abschalten,
+  # wenn keine Bewegung für Dauer von {{no_motion_wait}} existierte
+  - choose:
+    - conditions:
+      - condition: trigger
+        id: light_on_timeout
+      - condition: state
+        entity_id: !input motion_entity
+        state: 'off'
+        for: !input no_motion_wait
+      - condition: template
+        value_template: >-
+          {{ expand(my_lights.entity_id) | selectattr('state', '==','on') | list | count > 0 }}
+      sequence:
+      - action: light.turn_off
+        target: !input light_target

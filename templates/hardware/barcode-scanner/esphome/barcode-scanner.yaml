@@ -1,0 +1,23 @@
+substitutions:
+  name: "barcode-scanner"
+  friendly_name: "Barcode Scanner"
+
+  # Query ID für opentindb (https://opengtindb.org/api.php)
+  rest_opentindb_queryid: "400000000"
+
+  # I2C-Pins fürs Display
+  display_i2c_sda: GPIO21
+  display_i2c_scl: GPIO22
+
+  # I2C-Adresse des OLED Displays
+  ssd1306_i2c_address: "0x3C"
+
+  # UART-Pins für den Barcode-Scanner
+  uart_tx_pin: GPIO09
+  uart_rx_pin: GPIO10
+
+  # Pin des Buzzer/Beeper
+  beeper_pin: GPIO16
+
+packages:
+  barcode: github://SmartHome-yourself/barcode-scanner-for-esphome/barcode.yaml@main

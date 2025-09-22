@@ -1,0 +1,13 @@
+# <Kurzname> – Zweck/Hardware (ESP32/ESP8266)
+# Nutzung: drop-in; anpassbar via substitutions
+# Getestet mit: <Board/Setup>, ESPHome <Version>
+
+substitutions:
+  devicename: <slug>
+
+esphome:
+  name: ${devicename}
+
+logger:
+api:
+ota:

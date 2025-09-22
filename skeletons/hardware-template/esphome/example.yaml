@@ -1,0 +1,10 @@
+# Board-spezifische Grundeinstellung
+substitutions:
+  devicename: board-example
+
+esphome:
+  name: ${devicename}
+
+logger:
+api:
+ota:

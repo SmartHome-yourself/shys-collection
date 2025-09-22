@@ -1,0 +1,290 @@
+# Energie-Monitor Dashboard Card
+# Überwacht Stromverbrauch, Erzeugung und Kosten
+type: vertical-stack
+cards:
+  # Header mit Gesamtverbrauch
+  - type: horizontal-stack
+    cards:
+      - type: statistic
+        entity: sensor.energy_consumption_total
+        name: "Gesamtverbrauch"
+        stat_type: state
+        unit: "kWh"
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(135deg, #ff9800, #f57c00);
+              color: white;
+              border-radius: 15px;
+              text-align: center;
+            }
+      
+      - type: statistic  
+        entity: sensor.energy_production_total
+        name: "PV-Erzeugung"
+        stat_type: state
+        unit: "kWh"
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(135deg, #4caf50, #388e3c);
+              color: white; 
+              border-radius: 15px;
+              text-align: center;
+            }
+      
+      - type: statistic
+        entity: sensor.energy_costs_today
+        name: "Kosten heute"
+        stat_type: state 
+        unit: "€"
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(135deg, #2196f3, #1976d2);
+              color: white;
+              border-radius: 15px;
+              text-align: center;
+            }
+
+  # Aktuelle Leistung
+  - type: horizontal-stack
+    cards:
+      - type: gauge
+        entity: sensor.power_consumption_current
+        name: "Aktueller Verbrauch"
+        min: 0
+        max: 5000
+        unit: "W"
+        severity:
+          green: 0
+          yellow: 2000
+          red: 4000
+        card_mod:
+          style: |
+            ha-card {
+              border-radius: 15px;
+            }
+
+      - type: gauge
+        entity: sensor.power_production_current
+        name: "Aktuelle PV-Leistung"
+        min: 0
+        max: 8000
+        unit: "W"
+        severity:
+          red: 0
+          yellow: 2000
+          green: 4000
+        card_mod:
+          style: |
+            ha-card {
+              border-radius: 15px;
+            }
+
+  # Energie-Fluss Visualisierung
+  - type: picture-elements
+    image: /local/images/energy-flow-bg.png
+    elements:
+      # Netz
+      - type: state-label
+        entity: sensor.grid_power
+        prefix: "Netz: "
+        suffix: " W"
+        style:
+          top: 15%
+          left: 15%
+          color: white
+          background-color: rgba(0,0,0,0.5)
+          border-radius: 10px
+          padding: 5px
+
+      # PV-Anlage  
+      - type: state-label
+        entity: sensor.solar_power
+        prefix: "Solar: "
+        suffix: " W"
+        style:
+          top: 15%
+          right: 15%
+          color: white
+          background-color: rgba(0,0,0,0.5)
+          border-radius: 10px
+          padding: 5px
+
+      # Hausverbrauch
+      - type: state-label
+        entity: sensor.house_consumption
+        prefix: "Haus: "
+        suffix: " W"  
+        style:
+          bottom: 15%
+          left: 50%
+          color: white
+          background-color: rgba(0,0,0,0.5)
+          border-radius: 10px
+          padding: 5px
+
+      # Batterie (falls vorhanden)
+      - type: conditional
+        conditions:
+          - entity: sensor.battery_power
+            state_not: "unavailable"
+        elements:
+          - type: state-label
+            entity: sensor.battery_power
+            prefix: "Batterie: "
+            suffix: " W"
+            style:
+              top: 50%
+              right: 15%
+              color: white
+              background-color: rgba(0,0,0,0.5)
+              border-radius: 10px
+              padding: 5px
+
+  # Detaillierte Verbrauchsdaten
+  - type: horizontal-stack
+    cards:
+      # Verbrauch nach Gerätegruppen
+      - type: entities
+        title: "🔌 Verbrauch nach Bereichen"
+        entities:
+          - entity: sensor.kitchen_power
+            name: "Küche"
+            icon: "mdi:chef-hat"
+          - entity: sensor.living_room_power
+            name: "Wohnzimmer"
+            icon: "mdi:sofa"
+          - entity: sensor.bedroom_power
+            name: "Schlafzimmer"
+            icon: "mdi:bed"
+          - entity: sensor.office_power
+            name: "Büro"
+            icon: "mdi:desk"
+          - entity: sensor.heating_power
+            name: "Heizung"
+            icon: "mdi:radiator"
+        card_mod:
+          style: |
+            ha-card {
+              border-radius: 15px;
+            }
+
+      # Strompreise und Tarife
+      - type: entities
+        title: "💰 Strompreise"
+        entities:
+          - entity: sensor.electricity_price_current
+            name: "Aktueller Preis"
+            icon: "mdi:currency-eur"
+          - entity: sensor.electricity_price_next_hour
+            name: "Nächste Stunde"
+            icon: "mdi:clock-outline"
+          - entity: binary_sensor.cheap_electricity_hours
+            name: "Günstige Stunden"
+            icon: "mdi:flash"
+          - entity: sensor.feed_in_tariff
+            name: "Einspeisevergütung"
+            icon: "mdi:solar-power"
+        card_mod:
+          style: |
+            ha-card {
+              border-radius: 15px;
+            }
+
+  # Energiebilanz Chart
+  - type: history-graph
+    title: "Energieverlauf (24h)"
+    hours_to_show: 24
+    refresh_interval: 300
+    entities:
+      - entity: sensor.power_consumption_current
+        name: "Verbrauch"
+      - entity: sensor.power_production_current  
+        name: "PV-Erzeugung"
+      - entity: sensor.grid_power
+        name: "Netzbezug"
+    card_mod:
+      style: |
+        ha-card {
+          border-radius: 15px;
+        }
+
+  # Optimierungsempfehlungen
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.energy_optimization_available
+        state: "on"
+    card:
+      type: markdown
+      content: |
+        ## 💡 Optimierungsempfehlungen
+        
+        {% if is_state('binary_sensor.high_pv_production', 'on') %}
+        ☀️ **Hohe PV-Erzeugung**: Jetzt energieintensive Geräte einschalten (Waschmaschine, Spülmaschine)
+        {% endif %}
+        
+        {% if is_state('binary_sensor.cheap_electricity_hours', 'on') %}
+        💰 **Günstige Strompreise**: Optimaler Zeitpunkt für Elektroauto laden oder Warmwasser
+        {% endif %}
+        
+        {% if states('sensor.grid_power') | float > 3000 %}
+        ⚡ **Hoher Netzbezug**: Nicht-essentielle Geräte ausschalten
+        {% endif %}
+        
+        {% if states('sensor.battery_soc') | float < 20 %}
+        🔋 **Batterie niedrig**: Batterie wird geladen, Überschuss verfügbar
+        {% endif %}
+      card_mod:
+        style: |
+          ha-card {
+            background: rgba(76, 175, 80, 0.1);
+            border: 2px solid #4caf50;
+            border-radius: 15px;
+          }
+
+  # Schnellaktionen
+  - type: horizontal-stack
+    cards:
+      - type: button
+        name: "Eco-Modus"
+        icon: "mdi:leaf"
+        tap_action:
+          action: call-service
+          service: script.energy_eco_mode
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(45deg, #4caf50, #388e3c);
+              color: white;
+              border-radius: 15px;
+            }
+
+      - type: button
+        name: "PV-Überschuss nutzen"
+        icon: "mdi:solar-power"
+        tap_action:
+          action: call-service
+          service: script.use_pv_excess
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(45deg, #ff9800, #f57c00);
+              color: white;
+              border-radius: 15px;
+            }
+
+      - type: button
+        name: "Nachtmodus"
+        icon: "mdi:power-sleep"
+        tap_action:
+          action: call-service
+          service: script.energy_night_mode
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(45deg, #9c27b0, #7b1fa2);
+              color: white;
+              border-radius: 15px;
+            }

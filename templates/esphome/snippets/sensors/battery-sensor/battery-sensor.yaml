@@ -1,0 +1,47 @@
+
+# Batteriespannung Überwachung
+sensor:
+  - platform: adc
+    pin: A0
+    name: "${friendly_name} Battery Voltage"
+    id: battery_voltage
+    attenuation: 11db
+    update_interval: 10s
+    accuracy_decimals: 3
+    filters:
+      - multiply: 2.0  # Spannungsteiler-Korrektur (R1=R2)
+      - sliding_window_average:
+          window_size: 3
+          send_every: 3
+
+  # Batterie-Prozentsatz (für LiPo 3.7V)
+  - platform: template
+    name: "${friendly_name} Battery Level"
+    id: battery_level
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    accuracy_decimals: 0
+    lambda: |-
+      float voltage = id(battery_voltage).state;
+      float percentage;
+      
+      // LiPo Entladekurve (3.7V nominal)
+      if (voltage >= 4.15) {
+        percentage = 100.0;
+      } else if (voltage >= 4.0) {
+        percentage = 90.0 + (voltage - 4.0) / 0.15 * 10.0;
+      } else if (voltage >= 3.8) {
+        percentage = 70.0 + (voltage - 3.8) / 0.2 * 20.0;
+      } else if (voltage >= 3.7) {
+        percentage = 40.0 + (voltage - 3.7) / 0.1 * 30.0;
+      } else if (voltage >= 3.6) {
+        percentage = 20.0 + (voltage - 3.6) / 0.1 * 20.0;
+      } else if (voltage >= 3.4) {
+        percentage = 5.0 + (voltage - 3.4) / 0.2 * 15.0;
+      } else {
+        percentage = 0.0;
+      }
+      return max(0.0f, min(100.0f, percentage));
+    update_interval: 10s
+

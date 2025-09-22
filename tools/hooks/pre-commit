@@ -1,0 +1,23 @@
+#!/bin/sh
+# Pre-commit Hook - Validiert Templates vor dem Commit
+
+# Versuche python3, dann python
+if command -v python3 >/dev/null 2>&1; then
+    PYTHON_CMD="python3"
+elif command -v python >/dev/null 2>&1; then
+    PYTHON_CMD="python"
+else
+    echo "Fehler: Python nicht gefunden. Bitte Python installieren."
+    exit 1
+fi
+
+echo "Validiere Templates vor Commit..."
+$PYTHON_CMD tools/validator/validate.py
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ Validator hat Fehler gefunden. Commit abgebrochen."
+  echo "Bitte behebe die Fehler und versuche es erneut."
+  exit 1
+fi
+
+echo "✅ Validation erfolgreich. Commit wird fortgesetzt."

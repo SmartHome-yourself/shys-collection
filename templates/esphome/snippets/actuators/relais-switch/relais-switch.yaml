@@ -1,0 +1,14 @@
+
+# Relais-Schalter
+switch:
+  - platform: gpio
+    pin: GPIO5
+    name: "${friendly_name}"
+    id: relay_switch
+    icon: "mdi:power-socket-eu"
+    restore_mode: RESTORE_DEFAULT_OFF
+    device_class: outlet
+    on_turn_on:
+      - logger.log: "Schalter eingeschaltet"
+    on_turn_off:
+      - logger.log: "Schalter ausgeschaltet"

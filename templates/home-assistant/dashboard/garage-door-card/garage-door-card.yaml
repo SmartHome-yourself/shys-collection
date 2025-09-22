@@ -1,0 +1,309 @@
+# Garagentor Dashboard Card
+# Steuerung und Überwachung des Garagentors mit Status-Anzeige
+type: vertical-stack
+cards:
+  # Header mit Garagentor Status
+  - type: horizontal-stack
+    cards:
+      - type: markdown
+        content: |
+          # 🏠 Garage
+          **{{ states('cover.garage_door') | title }}**
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(135deg, 
+                {% if is_state('cover.garage_door', 'open') %}#4caf50
+                {% elif is_state('cover.garage_door', 'closed') %}#2196f3
+                {% elif is_state('cover.garage_door', 'opening') or is_state('cover.garage_door', 'closing') %}#ff9800
+                {% else %}#9e9e9e
+                {% endif %}, 
+                {% if is_state('cover.garage_door', 'open') %}#388e3c
+                {% elif is_state('cover.garage_door', 'closed') %}#1976d2  
+                {% elif is_state('cover.garage_door', 'opening') or is_state('cover.garage_door', 'closing') %}#f57c00
+                {% else %}#757575
+                {% endif %});
+              color: white;
+              border-radius: 15px 15px 0 0;
+              text-align: center;
+            }
+
+      # Schnell-Status Icons
+      - type: glance
+        entities:
+          - entity: binary_sensor.garage_door_contact
+            name: "Tor"
+          - entity: binary_sensor.garage_motion
+            name: "Bewegung"
+          - entity: binary_sensor.garage_light_barrier
+            name: "Lichtschranke"
+        columns: 3
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(255,255,255,0.1);
+              color: white;
+              border-radius: 0 15px 0 0;
+              border: none;
+            }
+
+  # Hauptsteuerung
+  - type: horizontal-stack
+    cards:
+      # Garagentor Steuerung
+      - type: vertical-stack
+        cards:
+          # Cover-Steuerung mit Animation
+          - type: cover
+            entity: cover.garage_door
+            name: "Garagentor"
+            card_mod:
+              style: |
+                ha-card {
+                  border-radius: 15px;
+                  overflow: hidden;
+                }
+                .state {
+                  {% if is_state('cover.garage_door', 'opening') or is_state('cover.garage_door', 'closing') %}
+                  animation: pulse 2s infinite;
+                  {% endif %}
+                }
+                @keyframes pulse {
+                  0% { opacity: 1; }
+                  50% { opacity: 0.5; }
+                  100% { opacity: 1; }
+                }
+
+          # Manuelle Buttons
+          - type: horizontal-stack
+            cards:
+              - type: button
+                name: "Öffnen"
+                icon: "mdi:garage-open"
+                tap_action:
+                  action: call-service
+                  service: cover.open_cover
+                  target:
+                    entity_id: cover.garage_door
+                hold_action:
+                  action: more-info
+                card_mod:
+                  style: |
+                    ha-card {
+                      background: linear-gradient(45deg, #4caf50, #388e3c);
+                      color: white;
+                      border-radius: 10px;
+                    }
+
+              - type: button
+                name: "Stopp"
+                icon: "mdi:stop"
+                tap_action:
+                  action: call-service
+                  service: cover.stop_cover
+                  target:
+                    entity_id: cover.garage_door
+                card_mod:
+                  style: |
+                    ha-card {
+                      background: linear-gradient(45deg, #ff9800, #f57c00);
+                      color: white;
+                      border-radius: 10px;
+                    }
+
+              - type: button
+                name: "Schließen"
+                icon: "mdi:garage"
+                tap_action:
+                  action: call-service
+                  service: cover.close_cover
+                  target:
+                    entity_id: cover.garage_door
+                hold_action:
+                  action: more-info
+                card_mod:
+                  style: |
+                    ha-card {
+                      background: linear-gradient(45deg, #2196f3, #1976d2);
+                      color: white;
+                      border-radius: 10px;
+                    }
+
+      # Status und Sensoren
+      - type: entities
+        title: "📊 Status & Sensoren"
+        entities:
+          - entity: sensor.garage_door_position
+            name: "Position"
+            icon: "mdi:garage-variant"
+          - entity: binary_sensor.garage_door_contact
+            name: "Tor-Kontakt"
+            icon: "mdi:garage-alert-variant"
+          - entity: binary_sensor.garage_motion
+            name: "Bewegung erkannt"
+            icon: "mdi:motion-sensor"
+          - entity: binary_sensor.garage_light_barrier
+            name: "Lichtschranke"
+            icon: "mdi:gate"
+          - entity: sensor.garage_door_battery
+            name: "Batterie Fernbedienung"
+            icon: "mdi:battery"
+        card_mod:
+          style: |
+            ha-card {
+              border-radius: 15px;
+            }
+
+  # Garage Umgebung
+  - type: horizontal-stack
+    cards:
+      # Beleuchtung
+      - type: entities
+        title: "💡 Beleuchtung"
+        entities:
+          - entity: switch.garage_main_light
+            name: "Hauptlicht"
+            icon: "mdi:ceiling-light"
+          - entity: switch.garage_work_light
+            name: "Arbeitslicht"
+            icon: "mdi:desk-lamp"
+          - entity: switch.garage_automatic_light
+            name: "Automatiklicht"
+            icon: "mdi:lightbulb-auto"
+        card_mod:
+          style: |
+            ha-card {
+              border-radius: 15px;
+            }
+
+      # Weitere Geräte
+      - type: entities
+        title: "🔌 Geräte"
+        entities:
+          - entity: switch.garage_outlet_1
+            name: "Steckdose 1"
+            icon: "mdi:power-socket-eu"
+          - entity: switch.garage_outlet_2
+            name: "Steckdose 2"
+            icon: "mdi:power-socket-eu"
+          - entity: switch.garage_ventilation
+            name: "Lüftung"
+            icon: "mdi:fan"
+          - entity: sensor.garage_temperature
+            name: "Temperatur"
+            icon: "mdi:thermometer"
+        card_mod:
+          style: |
+            ha-card {
+              border-radius: 15px;
+            }
+
+  # Sicherheit und Überwachung
+  - type: conditional
+    conditions:
+      - entity: binary_sensor.garage_security_issue
+        state: "on"
+    card:
+      type: markdown
+      content: |
+        ## ⚠️ Sicherheitshinweis
+        
+        {% if is_state('binary_sensor.garage_door_open_too_long', 'on') %}
+        🕐 **Tor seit {{ states('sensor.garage_door_open_duration') }} Minuten geöffnet**
+        {% endif %}
+        
+        {% if is_state('binary_sensor.garage_light_barrier_blocked', 'on') %}
+        🚧 **Lichtschranke blockiert** - Hindernis im Torbereich
+        {% endif %}
+        
+        {% if is_state('binary_sensor.garage_door_battery_low', 'on') %}
+        🔋 **Batterie der Fernbedienung schwach** ({{ states('sensor.garage_door_battery') }}%)
+        {% endif %}
+      card_mod:
+        style: |
+          ha-card {
+            background: rgba(244, 67, 54, 0.1);
+            border: 2px solid #f44336;
+            border-radius: 15px;
+          }
+
+  # Zeitgesteuertes öffnen/schließen
+  - type: entities
+    title: "⏰ Automatik"
+    entities:
+      - entity: input_boolean.garage_auto_close
+        name: "Automatisches Schließen"
+        icon: "mdi:garage-alert"
+      - entity: input_number.garage_auto_close_delay
+        name: "Schließen nach (min)"
+        icon: "mdi:timer"
+      - entity: input_boolean.garage_night_mode
+        name: "Nachtmodus"
+        icon: "mdi:sleep"
+      - entity: automation.garage_welcome_home
+        name: "Willkommen-Automatik"
+        icon: "mdi:home-assistant"
+    card_mod:
+      style: |
+        ha-card {
+          border-radius: 15px;
+        }
+
+  # Schnellaktionen
+  - type: horizontal-stack
+    cards:
+      - type: button
+        name: "Wegfahren"
+        icon: "mdi:car"
+        tap_action:
+          action: call-service
+          service: script.garage_leaving_home
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(45deg, #9c27b0, #7b1fa2);
+              color: white;
+              border-radius: 15px;
+            }
+
+      - type: button
+        name: "Heimkommen"
+        icon: "mdi:home-import-outline"
+        tap_action:
+          action: call-service
+          service: script.garage_arriving_home
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(45deg, #4caf50, #388e3c);
+              color: white;
+              border-radius: 15px;
+            }
+
+      - type: button
+        name: "Wartung"
+        icon: "mdi:wrench"
+        tap_action:
+          action: call-service
+          service: script.garage_maintenance_mode
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(45deg, #ff9800, #f57c00);
+              color: white;
+              border-radius: 15px;
+            }
+
+      - type: button
+        name: "Sicherheit"
+        icon: "mdi:shield-check"
+        tap_action:
+          action: call-service
+          service: script.garage_security_check
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(45deg, #f44336, #d32f2f);
+              color: white;
+              border-radius: 15px;
+            }
