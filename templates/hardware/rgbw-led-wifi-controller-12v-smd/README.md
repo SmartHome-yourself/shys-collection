@@ -1,4 +1,4 @@
-# RGBW-LED WiFi Controller mit ESPHome  
+# RGBW-LED WiFi Controller (v2) mit ESPHome  
 Ein update meines Wi­Fi-LED-Controller für 12 V RGBW Stripes (nicht-adressierbar), für ESPHome + Home Assistant.  
 Diese Variante setzt überwiegend auf SMD Bauteile und einen ESP12f.  
 Er ist primär als Controller für nicht adressierbare RGBW-LED Stripes gedacht, bietet aber auch für jeden Kanal einen einzelnen 2-Pol Ausgang, wodurch auch 4 einzelne 12V Geräte an/aus geschaltet werden können.  
