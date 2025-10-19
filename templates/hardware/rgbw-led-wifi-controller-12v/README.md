@@ -15,6 +15,7 @@ https://www.elecrow.com/sharepj/12-v-rgbw-wi-fi-led-controller-for-non-addressab
   
 ## Video zum Projekt:  
 **Video zum LED Controller mit ESPHome:**  
-[<img src="http://img.youtube.com/vi/DscxZi73mx8/0.jpg" width="400px">](https://www.youtube.com/watch?v=DscxZi73mx8)  
+<img src="http://img.youtube.com/vi/DscxZi73mx8/0.jpg" width="400px">  
+https://www.youtube.com/watch?v=DscxZi73mx8  
 
   

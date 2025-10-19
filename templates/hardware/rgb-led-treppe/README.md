@@ -18,6 +18,7 @@ https://www.elecrow.com/sharepj/animated-rgb-led-stairlight-with-esphome-home-as
   
 ## Video zum Projekt:  
 **Video zur RGB-LED Treppenbeleuchtung:**  
-[<img src="http://img.youtube.com/vi/DscxZi73mx8/0.jpg" width="400px">](https://www.youtube.com/watch?v=DscxZi73mx8)  
+<img src="http://img.youtube.com/vi/DscxZi73mx8/0.jpg" width="400px">  
+https://www.youtube.com/watch?v=DscxZi73mx8  
 
   
