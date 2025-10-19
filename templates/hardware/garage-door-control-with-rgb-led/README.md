@@ -36,6 +36,6 @@ https://www.elecrow.com/sharepj/smart-garage-door-control-with-animated-rgb-led-
   
 ## Video zum Projekt:  
 **Video zur RGB-LED Treppenbeleuchtung:**  
-[![Smarte Garagentor-Steuerung mit automatischer RGB-LED Beleuchtung](http://img.youtube.com/vi/NvoPeyG30WA/0.jpg)](https://www.youtube.com/watch?v=NvoPeyG30WA)  
+[<img src="http://img.youtube.com/vi/NvoPeyG30WA/0.jpg" width="400px">](https://www.youtube.com/watch?v=NvoPeyG30WA)  
   
   

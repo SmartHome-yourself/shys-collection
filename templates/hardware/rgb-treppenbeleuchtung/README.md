@@ -33,7 +33,7 @@ https://www.pcbway.com/project/shareproject/RGB_LED_Stairlight.html
 
   
 **Video zum Update: Stufenweise Animationen:**  
-[![RGB-Treppenbeleuchtung UPDATE](http://img.youtube.com/vi/29ch0v86I_o/0.jpg)](https://www.youtube.com/watch?v=29ch0v86I_o)
+[<img src="http://img.youtube.com/vi/29ch0v86I_o/0.jpg" width="400px">](https://www.youtube.com/watch?v=29ch0v86I_o)  
 
   
   
