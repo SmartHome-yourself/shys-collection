@@ -88,3 +88,17 @@ templates/
 - Alle Vorlagen entsprechen exakt der finalen Ordnerstruktur und bestehen die Validator-Prüfungen.  
 - Die enthaltenen `README.md`-Dateien dienen als Vorlage für das finale Projekt – sie sind keine technische Dokumentation, sondern Beispielinhalte für die spätere Veröffentlichung.  
 - Leere oder nicht benötigte Ordner dürfen entfernt werden, solange die Grundstruktur korrekt bleibt.
+
+
+## README.md Tipps
+**Gültige Markdown Syntax**
+- [![image](img-url)](link-url) *→ Bild mit Link*
+- ![image](img-url) *→ Bild ohne Link*
+- https://freistehende-url.com *→ Link*
+- [text](url) *→ Link mit Text*
+- `# Überschrift` *→ Überschrift Text (Stufe 1)*
+- `## Überschrift` *→ Überschrift Text (Stufe 2)*
+- `### Überschrift` *→ Überschrift Text (Stufe 3)*
+- `*Text*` *→ Kursiver Text*
+- `**Text**` *→ Fetter Text*
+- `_Text_` *→ Unterstrichener Text*
