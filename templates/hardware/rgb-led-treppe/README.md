@@ -16,9 +16,27 @@ https://www.smarthomeyourself.de/rgb-treppe
 **Die Platine findet Ihr auch bei ELECROW.com unter folgendem Link:**  
 https://www.elecrow.com/sharepj/animated-rgb-led-stairlight-with-esphome-home-assistant-806.html  
   
+## Verwendete Bauteile:
+**NodeMCU:** https://amzn.to/3xMmppB *  
+**Bewegungsmelder:** https://amzn.to/2PTrbAI *  
+**Photoresistor:** https://amzn.to/3ukm0J0 *  
+**RGB-LED-Stripes:** https://amzn.to/3ei12ol *  
+**LEDs:** https://amzn.to/33bRViM *  
+**Widerstände:** https://amzn.to/3eQghUJ *  
+**Netzteil:** https://amzn.to/3xJilq5 *  
+**Netzteil-Buchse:** https://amzn.to/33biVPo *  
+
 ## Video zum Projekt:  
 **Video zur RGB-LED Treppenbeleuchtung:**  
-<img src="http://img.youtube.com/vi/DscxZi73mx8/0.jpg" width="400px">  
-https://www.youtube.com/watch?v=DscxZi73mx8  
+[![image](http://img.youtube.com/vi/DscxZi73mx8/0.jpg)](https://www.youtube.com/watch?v=DscxZi73mx8)  
+  
 
+## Weitere Videos zum Projekt:  
+**Video zur ursprünglichen Variante der RGB-Treppenbeleuchtung:**  
+[![image](http://img.youtube.com/vi/jhAS_OhYyys/0.jpg)](https://www.youtube.com/watch?v=jhAS_OhYyys)  
+  
+  
+**Video zum Update: Stufenweise Animationen:**  
+[![image](http://img.youtube.com/vi/29ch0v86I_o/0.jpg)](https://www.youtube.com/watch?v=29ch0v86I_o)  
+  
   
