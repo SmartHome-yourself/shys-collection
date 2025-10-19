@@ -1,0 +1,15 @@
+# PN532
+
+pn532_i2c:
+  update_interval: 3s
+  on_tag:
+    then:
+      - lambda: |-
+          std::string tag_id = x;
+          ESP_LOGD("tagreader", "Tag erkannt: %s", tag_id.c_str());
+
+          if (tag_id == "84-8F-E3") {
+            ESP_LOGD("tagreader", "Tag erkannt: HIER AKTION FÜR 1. TAG HINTERLEGEN");
+          } else if (tag_id == "04-49-61-80") {
+            ESP_LOGD("tagreader", "Tag erkannt: HIER AKTION FÜR 2. TAG HINTERLEGEN");
+          } 
