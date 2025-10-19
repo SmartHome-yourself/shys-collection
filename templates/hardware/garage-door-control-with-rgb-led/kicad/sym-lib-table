@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "Garagentor_LEDs-rescue")(type "KiCad")(uri "${KIPRJMOD}/Garagentor_LEDs-rescue.kicad_sym")(options "")(descr ""))
+)

@@ -6,3 +6,4 @@ Zweck/Ergebnis in 1–2 Sätzen; keine eigene PCB notwendig.
 
 ## Hinweise
 - Secrets via `!secret` (https://esphome.io/guides/secrets.html)
+
