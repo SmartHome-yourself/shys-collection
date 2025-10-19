@@ -18,6 +18,6 @@ https://www.elecrow.com/sharepj/animated-rgb-led-stairlight-with-esphome-home-as
   
 ## Video zum Projekt:  
 **Video zur RGB-LED Treppenbeleuchtung:**  
-[![RGB LED Treppenbeleuchtung für Home Assistant mit ESPHome](http://img.youtube.com/vi/DscxZi73mx8/0.jpg)](https://www.youtube.com/watch?v=DscxZi73mx8 "Video zur RGB LED Treppenbeleuchtung mit ESPHome")  
+[![RGB LED Treppenbeleuchtung für Home Assistant mit ESPHome](http://img.youtube.com/vi/DscxZi73mx8/0.jpg)](https://www.youtube.com/watch?v=DscxZi73mx8)  
   
   

@@ -15,6 +15,6 @@ https://www.elecrow.com/sharepj/12-v-rgbw-wi-fi-led-controller-for-non-addressab
   
 ## Video zum Projekt:  
 **Video zum LED Controller mit ESPHome:**  
-[![WLAN RGB LED Controller für Home Assistant mit ESPHome](http://img.youtube.com/vi/DscxZi73mx8/0.jpg)](https://www.youtube.com/watch?v=DscxZi73mx8 "Video zum WLAN RGB LED Controller mit ESPHome")  
+[![WLAN RGB LED Controller für Home Assistant mit ESPHome](http://img.youtube.com/vi/DscxZi73mx8/0.jpg)](https://www.youtube.com/watch?v=DscxZi73mx8)  
   
   
