@@ -1,5 +1,5 @@
-name: ESPHome Setup Submission
-description: Submit a complete ESPHome project setup for the community collection
+name: ESPHome Setup einreichen
+description: Vollständiges ESPHome Projekt-Setup zur Collection beitragen
 title: "Hier dein Projekt-Name"
 labels: ["setup", "esphome"]
 body:
@@ -27,7 +27,7 @@ body:
   - type: dropdown
     id: project_type
     attributes:
-      label: "Project Type"
+      label: "Projekttyp"
       options:
         - "esphome-setup"
     validations:

@@ -1,0 +1,57 @@
+name: 🐛 Fehler melden
+description: Fehler, Bugs oder Probleme mit der Collection melden
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🐛 Fehler melden
+        
+        Nutze dieses Template, um Fehler oder Probleme zu melden:
+        - Fehlerhafte Templates
+        - Probleme mit Validierung
+        - Broken Links
+        - etc.
+        
+        **Für neue Projekte einreichen:** Nutze bitte die spezifischen Templates (ESPHome, Hardware, etc.)
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Beschreibung des Fehlers"
+      description: "Was funktioniert nicht wie erwartet?"
+      placeholder: "Beschreibe das Problem so detailliert wie möglich..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Erwartetes Verhalten"
+      description: "Was sollte stattdessen passieren?"
+      placeholder: "Was hast du erwartet?"
+    validations:
+      required: false
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Schritte zur Reproduktion"
+      description: "Wie kann der Fehler nachgestellt werden?"
+      placeholder: |
+        1. Gehe zu...
+        2. Klicke auf...
+        3. Fehler tritt auf...
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: "Zusätzliche Informationen"
+      description: "Screenshots, Logs, oder weitere hilfreiche Informationen"
+      placeholder: "Falls vorhanden..."
+    validations:
+      required: false
+

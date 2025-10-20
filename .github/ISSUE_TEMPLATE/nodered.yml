@@ -1,5 +1,5 @@
-name: Node-RED Flow Submission
-description: Submit Node-RED flows for the community collection
+name: Node-RED Flow einreichen
+description: Node-RED Flows zur Collection beitragen
 title: "Hier dein Projekt-Name"
 labels: ["nodered", "flow"]
 body:
@@ -27,7 +27,7 @@ body:
   - type: dropdown
     id: project_type
     attributes:
-      label: "Project Type"
+      label: "Projekttyp"
       options:
         - "nodered"
     validations:

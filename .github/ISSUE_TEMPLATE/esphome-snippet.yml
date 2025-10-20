@@ -1,5 +1,5 @@
-name: ESPHome Snippet Submission
-description: Einzelne ESPHome Code-Snippets und Komponenten
+name: ESPHome Snippet einreichen
+description: Einzelne ESPHome Code-Snippets und Komponenten zur Collection beitragen
 title: "Hier dein Projekt-Name"
 labels: ["snippet", "esphome"]
 body:
@@ -39,7 +39,7 @@ body:
   - type: dropdown
     id: project_type
     attributes:
-      label: "Project Type"
+      label: "Projekttyp"
       options:
         - "esphome-snippet"
     validations:

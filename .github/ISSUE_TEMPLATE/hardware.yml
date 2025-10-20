@@ -1,5 +1,5 @@
-name: Hardware Project Submission
-description: Submit hardware projects including PCBs, manufacturing files, and assets for the community collection
+name: Hardware-Projekt einreichen
+description: Hardware-Projekt inklusive PCBs, Fertigungsdateien und Assets zur Collection beitragen
 title: "Hier dein Projekt-Name"
 labels: ["hardware", "pcb"]
 body:
@@ -27,7 +27,7 @@ body:
   - type: dropdown
     id: project_type
     attributes:
-      label: "Project Type"
+      label: "Projekttyp"
       options:
         - "hardware"
     validations:
