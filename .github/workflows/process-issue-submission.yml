@@ -2,7 +2,7 @@ name: Process Issue ZIP Submission
 
 on:
   issues:
-    types: [opened, edited]
+    types: [opened]
   issue_comment:
     types: [created]
 
@@ -70,7 +70,7 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
-            -d '{"body":"❌ **Titel muss geändert werden!**\n\nBitte ändere den Titel von \"Hier dein Projekt-Name\" zu deinem echten Projektnamen.\n\n**Beispiele:**\n- `Temperatursensor mit OLED Display`\n- `Smart Doorbell mit ESP32`\n- `Wetterstation Hardware`\n\nDanach wird die Verarbeitung automatisch fortgesetzt! 🚀"}'
+            -d '{"body":"❌ **Titel muss geändert werden!**\n\nBitte ändere den Titel von \"Hier dein Projekt-Name\" zu deinem echten Projektnamen.\n\n**Beispiele:**\n- `Temperatursensor mit OLED Display`\n- `Smart Doorbell mit ESP32`\n- `Wetterstation Hardware`\n\n## 📤 Nächste Schritte:\n1. Ändere den Issue-Titel oben\n2. Lade deine ZIP-Datei **als Kommentar** unter diesem Issue hoch\n3. Die Verarbeitung startet dann automatisch erneut! 🚀"}'
           
           exit 1
         fi
