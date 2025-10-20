@@ -20,24 +20,42 @@ Fokus: **einfach**, **überschaubar**, **konsistente Ordner**. Optional gibt's e
 ```
 
 
-## Neue Projekte hinzufügen
+## 🚀 Zur Collection beitragen
 
-**Einfachste Methode:**
+Es gibt **zwei Wege**, eigene Projekte beizutragen:
+
+### Methode 1: ZIP-Upload via Issue (Einfach für Einsteiger)
+
+**Perfekt für Nutzer ohne Git-Kenntnisse!**
+
+1. **[Neues Issue erstellen](../../issues/new/choose)** und Template wählen
+2. ZIP-Datei mit deinem Projekt hochladen
+3. Automatische Validierung prüft dein Projekt
+4. Bei Erfolg: Automatischer Pull Request wird erstellt! ✅
+5. Bei Fehlern: Detaillierte Rückmeldung im Issue mit Korrekturhinweisen
+
+**Verfügbare Templates:**
+- ESPHome Snippet (Sensoren, Aktoren, etc.)
+- ESPHome Setup (Komplette Projekte)
+- Hardware (PCB-Designs)
+- Home Assistant (Integrationen, Dashboards, Blueprints)
+- Node-RED Flows
+
+### Methode 2: Direkter Beitrag via Git (Für Entwickler)
+
+**Für erfahrene Git-Nutzer:**
+
 1. Passende Vorlage aus `/skeletons/` kopieren
 2. In den richtigen `/templates/` Unterordner einfügen
 3. Ordner umbenennen und Platzhalter ausfüllen
+4. Pre-Commit Hook installieren (siehe unten)
+5. Committen und Pull Request erstellen
 
 **Beispiel:**
 ```bash
 cp -r skeletons/esphome-snippet-template/ templates/esphome/snippets/sensors/mein-sensor/
 cd templates/esphome/snippets/sensors/mein-sensor/
 # slug.yaml → mein-sensor.yaml umbenennen
-# README.md anpassen
-
-# Für Setups (YAML direkt im Projekt-Root):
-cp -r skeletons/esphome-setup-template/ templates/esphome/setups/mein-setup/
-cd templates/esphome/setups/mein-setup/
-# slug.yaml → mein-setup.yaml umbenennen
 # README.md anpassen
 ```
 
@@ -65,14 +83,26 @@ pip install -r tools/validator/requirements.txt
 python tools/validator/validate.py
 ```
 
-### Pre-commit (optional, lokal)
+### 🛡️ Pre-commit Hook (nur für Team-Mitglieder)
 
-**Git Bash:**
-```bash
-bash tools/hooks/install.sh
-```
+**Wichtig:** Der Pre-Commit Hook ist nur für **direkte Team-Mitglieder** relevant, die in Branches arbeiten.
+**Externe Contributors** nutzen ZIP-Upload via Issues oder Forks - die Validierung läuft automatisch auf GitHub!
 
-**PowerShell:**
+**Installation (Team-Mitglieder):**
+
+**Windows (PowerShell):**
 ```powershell
-Copy-Item tools/hooks/pre-commit .git/hooks/pre-commit
+.\tools\hooks\install.ps1
 ```
+
+**Linux/Mac (Bash):**
+```bash
+./tools/hooks/install.sh
+```
+
+**Was macht der Hook?**
+- Blockiert fehlerhafte Commits **vor** dem Push
+- Führt Validator automatisch bei jedem Commit aus
+- Spart Zeit, da Fehler sofort lokal erkannt werden
+
+**Hinweis:** Auch ohne Hook sind alle Beiträge geschützt - GitHub Actions validiert automatisch bei jedem Pull Request!

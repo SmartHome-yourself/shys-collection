@@ -1,0 +1,59 @@
+name: Hardware Project Submission
+description: Submit hardware projects including PCBs, manufacturing files, and assets for the community collection
+title: "Hier dein Projekt-Name"
+labels: ["hardware", "pcb"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 📁 ZIP-Upload
+        
+        **Wichtig:** Lade dein Projekt als ZIP-Datei hoch, damit es automatisch verarbeitet werden kann.
+        
+        1. Erstelle dein Projekt basierend auf dem Skeleton aus `/skeletons/hardware-template/`
+        2. Packe den kompletten Projektordner als ZIP
+        3. Ziehe die **ZIP-Datei** unten in das Textfeld hinein
+        4. Die README.md in der ZIP wird automatisch verwendet
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "ZIP-Datei hochladen"
+      description: "Ziehe deine ZIP-Datei hier hinein oder füge sie als Anhang hinzu"
+      placeholder: "ZIP-Datei hier hineinziehen oder als Anhang hinzufügen..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: project_type
+    attributes:
+      label: "Project Type"
+      options:
+        - "hardware"
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ## 📁 Erwartete Ordnerstruktur
+        ```
+        templates/hardware/<slug>/
+        ├── assets/ (optional: Bilder und weitere Datei-Anhänge)
+        ├── esphome/ (optional: ESPHome Code)
+        ├── kicad/ (optional: KiCAD Projektdateien)
+        ├── manufacturing/ (optional: Fertigungsdateien)
+        └── README.md (Pflicht)
+        ```
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "Prüfung abgeschlossen"
+      description: "Ich bestätige, dass ich alles korrekt vorbereitet habe"
+      options:
+        - label: "✅ Ich habe das Skeleton zur Erstellung der ZIP-Datei verwendet, 
+                  alle Dateien korrekt benannt, die README.md gefüllt,
+                  mein Hardware-Projekt getestet und alle Ordner-/Dateinamen sind in kebab-case"
+          required: true
+

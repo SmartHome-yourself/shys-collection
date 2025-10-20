@@ -3,7 +3,18 @@ from pathlib import Path
 import sys, json, re
 import yaml
 
-REPO = Path(__file__).resolve().parents[2]
+# Fix Windows console encoding for emojis
+if sys.platform == 'win32':
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
+# Allow optional path argument (for ZIP extraction validation)
+if len(sys.argv) > 1:
+    REPO = Path(sys.argv[1]).resolve()
+else:
+    REPO = Path(__file__).resolve().parents[2]
+
 errors = []
 
 def err(msg, path=None):
@@ -183,6 +194,33 @@ def check_nodered():
     for j in base.rglob('*.json'):
         load_json(j)
 
+def format_errors_for_github():
+    """Format errors in a user-friendly way for GitHub issues"""
+    output = []
+    output.append("❌ **Dein Projekt hat folgende Validierungsfehler:**\n")
+    
+    for i, error in enumerate(errors, 1):
+        # Clean up error message
+        clean_error = error.replace("ERROR: ", "").replace(str(REPO) + "/", "")
+        clean_error = clean_error.replace(str(REPO) + "\\", "")
+        output.append(f"{i}. {clean_error}")
+    
+    output.append("\n## 🔧 Häufige Probleme und Lösungen:\n")
+    output.append("- **Ordner-/Dateinamen**: Nur Kleinbuchstaben, Ziffern und Bindestrich (-) erlaubt")
+    output.append("  - ❌ Falsch: `my_project`, `MyProject`, `project_123`")
+    output.append("  - ✅ Richtig: `my-project`, `project-123`\n")
+    output.append("- **README.md fehlt**: Jedes Projekt braucht eine README.md mit Beschreibung\n")
+    output.append("- **Ordnerstruktur**: Prüfe ob alle Pflichtordner vorhanden sind")
+    output.append("  - ESPHome Snippets: `templates/esphome/snippets/[kategorie]/[slug]/`")
+    output.append("  - Hardware: `templates/hardware/[slug]/` mit kicad/, manufacturing/, esphome/ Ordnern\n")
+    output.append("## 📤 Nächste Schritte:\n")
+    output.append("1. Korrigiere die oben genannten Fehler")
+    output.append("2. Packe dein Projekt erneut als ZIP")
+    output.append("3. Lade die korrigierte ZIP-Datei **als Kommentar** unter diesem Issue hoch")
+    output.append("4. Die Validierung läuft automatisch erneut! 🔄")
+    
+    return "\n".join(output)
+
 def main():
     check_structure()
     check_category_roots()  # Neue Prüfung hinzugefügt
@@ -195,16 +233,24 @@ def main():
 
     if errors:
         log_file = REPO / "validation_errors.log"
-        with open(log_file, "w") as f:
+        with open(log_file, "w", encoding="utf-8") as f:
             f.write('\n'.join(errors))
-        print(f" Validation failed - Log in REPO/validation_errors.log - ")
-        print("\n=== Validation Errors ===")
-        for error in errors:
-            print(error)
-        print("=" * 30)
+        
+        # Check if we should output GitHub-friendly format
+        github_format = "--github" in sys.argv
+        
+        if github_format:
+            print(format_errors_for_github())
+        else:
+            print(f" Validation failed - Log in REPO/validation_errors.log - ")
+            print("\n=== Validation Errors ===")
+            for error in errors:
+                print(error)
+            print("=" * 30)
+        
         sys.exit(1)
 
-    print('Validator: OK')
+    print('✅ Validator: OK - Alle Prüfungen bestanden!')
 
 if __name__ == "__main__":
     main()

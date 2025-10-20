@@ -1,0 +1,69 @@
+name: ESPHome Snippet Submission
+description: Einzelne ESPHome Code-Snippets und Komponenten
+title: "Hier dein Projekt-Name"
+labels: ["snippet", "esphome"]
+body:
+  - type: dropdown
+    id: category
+    attributes:
+      label: "Kategorie"
+      description: "Wähle die passende Kategorie für dein Snippet"
+      options:
+        - "actuators"
+        - "helpers"
+        - "networks"
+        - "sensors"
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ## 📁 ZIP-Upload
+        
+        **Wichtig:** Lade dein Projekt als ZIP-Datei hoch, damit es automatisch verarbeitet werden kann.
+        
+        1. Erstelle dein Projekt basierend auf dem Skeleton aus `/skeletons/esphome-snippet-template/`
+        2. Packe den kompletten Projektordner als ZIP
+        3. Ziehe die **ZIP-Datei** unten in das Textfeld hinein
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "ZIP-Datei hochladen"
+      description: "Ziehe deine ZIP-Datei hier hinein oder füge sie als Anhang hinzu"
+      placeholder: "ZIP-Datei hier hineinziehen oder als Anhang hinzufügen..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: project_type
+    attributes:
+      label: "Project Type"
+      options:
+        - "esphome-snippet"
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ## 📁 Erwartete Ordnerstruktur
+        ```
+        templates/esphome/snippets/<category>/<slug>/
+        ├── README.md
+        ├── main.yaml
+        └── (weitere .yaml Dateien)
+        ```
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "Prüfung abgeschlossen"
+      description: "Ich bestätige, dass ich alles korrekt vorbereitet habe"
+      options:
+        - label: "✅ Ich habe das Skeleton zur Erstellung der ZIP-Datei verwendet, 
+                  alle Dateien korrekt benannt, die README.md gefüllt,
+                  mein Snippet getestet und alle Ordner-/Dateinamen sind in kebab-case"
+          required: true
+

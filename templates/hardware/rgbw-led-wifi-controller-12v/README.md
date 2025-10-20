@@ -1,4 +1,4 @@
-# RGB(W)-LED WiFi Controller mit ESPHome  
+# RGBW-LED WiFi Controller mit ESPHome  
 Ein kleiner Wi­Fi-LED-Controller für 12 V RGBW Stripes (nicht-adressierbar), speziell geeignet für ESPHome + Home Assistant Integration.
 
 ## Merkmale  
