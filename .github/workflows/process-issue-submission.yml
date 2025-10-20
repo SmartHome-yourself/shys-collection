@@ -151,48 +151,64 @@ jobs:
     - name: Download ZIP
       uses: actions/github-script@v7
       with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const fs = require('fs');
+          const https = require('https');
           const zipUrl = '${{ steps.extract-zip.outputs.zip_url }}';
           console.log('📥 Downloading ZIP from:', zipUrl);
           
           try {
-            let response = await fetch(zipUrl, {
-              headers: { 'User-Agent': 'GitHub-Actions' }
+            // GitHub user-attachments require special handling
+            const response = await github.request('GET ' + zipUrl, {
+              headers: {
+                'Accept': 'application/octet-stream'
+              },
+              request: {
+                redirect: 'follow'
+              }
             });
             
-            if (!response.ok) {
-              response = await fetch(zipUrl, {
+            let buffer;
+            if (response.data instanceof ArrayBuffer) {
+              buffer = Buffer.from(response.data);
+            } else if (Buffer.isBuffer(response.data)) {
+              buffer = response.data;
+            } else {
+              // Try direct fetch as fallback
+              const fetchResponse = await fetch(zipUrl, {
                 headers: {
-                  'Authorization': `Bearer ${{ secrets.GITHUB_TOKEN }}`,
+                  'Authorization': `token ${{ secrets.GITHUB_TOKEN }}`,
                   'Accept': 'application/octet-stream',
                   'User-Agent': 'GitHub-Actions'
-                }
+                },
+                redirect: 'follow'
               });
+              
+              if (!fetchResponse.ok) {
+                throw new Error(`HTTP ${fetchResponse.status}: ${fetchResponse.statusText}`);
+              }
+              
+              const arrayBuffer = await fetchResponse.arrayBuffer();
+              buffer = Buffer.from(arrayBuffer);
             }
             
-            if (!response.ok) {
-              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            if (buffer.length < 100) {
+              throw new Error('Download failed - file too small (less than 100 bytes)');
             }
             
-            const buffer = await response.arrayBuffer();
-            const uint8Array = new Uint8Array(buffer);
-            
-            if (uint8Array.length < 100) {
-              throw new Error('Download failed - file too small');
-            }
-            
-            fs.writeFileSync('submission.zip', uint8Array);
-            console.log('✅ ZIP file saved');
+            fs.writeFileSync('submission.zip', buffer);
+            console.log(`✅ ZIP file saved (${buffer.length} bytes)`);
             
           } catch (error) {
             console.error('❌ Download failed:', error.message);
+            console.error('Full error:', error);
             
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `❌ **ZIP-Download fehlgeschlagen**\n\n**Fehler:** ${error.message}\n\n💡 **Lösung:** Bitte lade die ZIP-Datei als Kommentar hoch statt im Formular-Feld.`
+              body: `❌ **ZIP-Download fehlgeschlagen**\n\n**Fehler:** ${error.message}\n\n💡 **Problem:** GitHub user-attachments sind manchmal schwer für Workflows zugänglich.\n\n## 🔧 Lösung:\n\n**Bitte lade deine ZIP-Datei als **KOMMENTAR** hier unter diesem Issue hoch (nicht über das Formular):**\n\n1. Klicke unten auf "Add a comment"\n2. Ziehe deine ZIP-Datei in das Kommentarfeld\n3. Sende den Kommentar ab\n4. Die Verarbeitung startet automatisch! 🚀`
             });
             
             process.exit(1);
