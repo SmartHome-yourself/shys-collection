@@ -119,7 +119,7 @@ def check_esphome_setups():
         if not yamls:
             err("Keine YAML im Setup-Ordner gefunden (mind. eine .yaml erforderlich)", setup)
         for child in setup.iterdir():
-            if child.is_dir() and child.name not in {"assets", "variants"}:
+            if child.is_dir() and child.name not in {"assets", "variants", "components"}:
                 err(f"Unerlaubter Ordner in setups/{setup.name}: {child.name}", child)
 
 def check_hardware():
@@ -137,6 +137,14 @@ def check_hardware():
         for child in board.iterdir():
             if child.is_dir() and child.name not in {"kicad","manufacturing","esphome","assets"}:
                 err(f"Unerlaubter Ordner in {board.name}: {child.name}")
+        
+        # Check esphome/ subdirectory for allowed folders
+        esphome_dir = board / "esphome"
+        if esphome_dir.exists() and esphome_dir.is_dir():
+            for child in esphome_dir.iterdir():
+                if child.is_dir() and child.name not in {"variants", "components"}:
+                    err(f"Unerlaubter Ordner in {board.name}/esphome: {child.name}", child)
+        
         mf = board / "manufacturing"
         if mf.exists():
             has_bom = any((mf / f).exists() for f in ["bom.csv"]) or list(mf.glob("bom.*"))
