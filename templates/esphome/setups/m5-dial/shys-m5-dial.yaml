@@ -1,0 +1,61 @@
+substitutions:
+  name: "m5-dial"
+  wifi_ssid: !secret wifi_ssid
+  wifi_password: !secret wifi_password
+
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+  project:
+    name: smarthomeyourself.m5_dial
+    version: "1.1"
+      
+  platformio_options:
+    lib_deps:
+      - Wire
+      - EEPROM
+      - ArduinoJson
+      - m5stack/M5Unified@0.1.14
+      - m5stack/M5Dial@1.0.2
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+  flash_size: 8MB
+
+logger:
+  level: INFO
+  logs:
+    api: WARN
+    esp32.preferences: WARN
+    LOOP: WARN
+    DISPLAY: WARN
+    TOUCH: WARN
+    HA_API: WARN
+    DEVICE: WARN
+    MEDIAPLAYER: WARN
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/SmartHome-yourself/shys-collection/templates/esphome/setups/m5-dial/
+      ref: main
+    components: [shys_m5_dial]
+
+dashboard_import:
+  package_import_url: github://SmartHome-yourself/shys-collection/templates/esphome/setups/m5-dial//shys-m5-dial.yaml@main
+  import_full_config: false
+
+api:
+ota:
+  platform: esphome
+
+improv_serial:
+captive_portal:
+
+wifi:
+  ssid: ${wifi_ssid}
+  password: ${wifi_password}
+  ap:
+    password: "12345678"
