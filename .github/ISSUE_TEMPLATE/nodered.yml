@@ -21,8 +21,10 @@ body:
         
         1. Erstelle dein Projekt basierend auf dem Skeleton aus `/skeletons/nodered-template/`
         2. Packe den kompletten Projektordner als ZIP
-        3. Ziehe die **ZIP-Datei** unten in das Textfeld hinein
+        3. Ziehe die **ZIP-Datei** oben in das Textfeld hinein
         4. Die README.md in der ZIP wird automatisch verwendet
+        
+        💡 **Tipp:** Falls die Validierung fehlschlägt, kannst du eine korrigierte ZIP als Kommentar hochladen!
 
   - type: dropdown
     id: project_type

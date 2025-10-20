@@ -27,7 +27,7 @@ body:
         2. Packe den kompletten Projektordner als ZIP
         3. Ziehe die **ZIP-Datei** unten in das Textfeld hinein
         
-        ℹ️ **Tipp:** Falls der automatische Download fehlschlägt, kannst du die ZIP auch als Kommentar hochladen!
+        💡 **Tipp:** Falls die Validierung fehlschlägt, kannst du eine korrigierte ZIP als Kommentar hochladen!
 
   - type: textarea
     id: description
