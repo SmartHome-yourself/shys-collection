@@ -1,0 +1,10 @@
+# Beispiel-Setup
+substitutions:
+  devicename: example-setup
+
+esphome:
+  name: ${devicename}
+
+logger:
+api:
+ota:

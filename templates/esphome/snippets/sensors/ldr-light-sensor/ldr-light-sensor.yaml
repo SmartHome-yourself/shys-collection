@@ -1,0 +1,51 @@
+# LDR (Light Dependent Resistor) Lichtsensor
+# Analoger Lichtsensor mit Spannungsteiler und LDR
+sensor:
+  - platform: adc
+    pin: A0  # Passenden Analog-Pin verwenden (z.B. GPIO36 bei ESP32)
+    name: "${friendly_name} Light Sensor Raw"
+    id: ldr_raw
+    update_interval: 10s
+    accuracy_decimals: 3
+    internal: true  # Rohe Spannungswerte verstecken
+    attenuation: auto
+    filters:
+      - multiply: 3.3  # In Spannung umwandeln (0-3.3V)
+
+  - platform: template
+    name: "${friendly_name} Light Level"
+    id: light_level
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    device_class: illuminance
+    state_class: measurement
+    icon: "mdi:brightness-6"
+    update_interval: 10s
+    lambda: |-
+      // Spannung in Prozent umwandeln (je nach LDR-Eigenschaften anpassen)
+      float voltage = id(ldr_raw).state;
+      float percentage = (voltage / 3.3) * 100.0;
+      
+      // Falls nötig invertieren (abhängig von Verkabelung: LDR zu GND oder LDR zu VCC)
+      // percentage = 100.0 - percentage;
+      
+      return percentage;
+    filters:
+      - sliding_window_average:
+          window_size: 5
+          send_every: 3
+
+# Optional: Binärsensor für Tag/Nacht-Erkennung
+binary_sensor:
+  - platform: template
+    name: "${friendly_name} Daylight"
+    id: daylight_sensor
+    device_class: light
+    lambda: |-
+      if (id(light_level).state > 30.0) {  // Schwellenwert nach Bedarf anpassen
+        return true;   // Tag
+      } else {
+        return false;  // Nacht
+      }
+    filters:
+      - delayed_on_off: 30s  # Flackern während Dämmerung verhindern

@@ -1,0 +1,111 @@
+esphome:
+  name: hue_ambiance_clone_d1mini
+  platform: ESP8266
+  board: d1_mini
+
+wifi:
+  ssid: YOUR_WIFI_SSID
+  password: YOUR_WIFI_PASSWORD
+  
+  reboot_timeout: 0s
+  output_power: 15dB
+  
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "RGB Backlight"
+    password: "123456789"
+
+captive_portal:
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  password: YOUR_API_PASSWORD
+
+ota:
+  password: YOUR_OTA_PASSWORD
+
+
+globals:
+  - id: currentColor
+    type: int
+    restore_value: yes
+    initial_value: "0"
+
+  - id: colorsRed
+    type: float[8]
+    initial_value: "{1,0,1,1,0,1,0.6,0}"
+
+  - id: colorsGreen
+    type: float[8]
+    initial_value: "{1,1,0,0,1,0.5,0,0}"
+
+  - id: colorsBlue
+    type: float[8]
+    initial_value: "{1,0,0,1,1,0.1,1,1}"
+
+binary_sensor:
+  - platform: gpio
+    pin: D5
+    name: "Power Button Ambience"
+    on_press:
+      then:
+        - light.toggle: hue_ambiance_clone_d1
+
+  - platform: gpio
+    pin: D6
+    name: "Color Button Ambience"
+
+    on_press:
+      then:
+        - lambda: |-
+            if(id(currentColor)>7){
+              id(currentColor) = 0;
+            } else {
+              id(currentColor) += 1;
+            }
+
+        - logger.log:
+            format: "The new color %1d is R: %2f G:  %2f B:  %2f"
+            args: [ 'id(currentColor)',  'id(colorsRed)[id(currentColor)]', 'id(colorsGreen)[id(currentColor)]', 'id(colorsBlue)[id(currentColor)]' ]
+
+        - if:
+            condition:
+              lambda: 'return id(currentColor) == 8;'
+            then:
+              - light.turn_on:
+                  id: hue_ambiance_clone_d1
+
+                  effect: "Rainbow"
+            else:
+              - light.turn_on:
+                  id: hue_ambiance_clone_d1
+                  effect: "None"
+              - light.turn_on:
+                  id: hue_ambiance_clone_d1
+                  transition_length: 2s
+                  red: !lambda |-
+                    return id(colorsRed)[id(currentColor)];
+                  green:  !lambda |-
+                    return id(colorsGreen)[id(currentColor)];
+                  blue:  !lambda |-
+                    return id(colorsBlue)[id(currentColor)];
+
+light:
+  - platform: fastled_clockless
+    chipset: WS2812B
+    pin: D3
+    num_leds: 30
+    default_transition_length: 3s
+    rgb_order: GRB
+    name: "Hue Ambiance LED Lights"
+    id: hue_ambiance_clone_d1
+    
+    effects:
+      - addressable_rainbow:
+          name: Rainbow
+          speed: 3
+          width: 100
+      

@@ -1,0 +1,30 @@
+# DHT22 Sensor
+sensor:
+  - platform: dht
+    pin: GPIO4
+    model: DHT22
+    temperature:
+      name: "${friendly_name} Temperature"
+      id: temp_sensor
+      unit_of_measurement: "°C"
+      accuracy_decimals: 1
+      device_class: temperature
+      state_class: measurement
+      filters:
+        - offset: 0.0  # Kalibrierungs-Offset
+        - sliding_window_average:
+            window_size: 5
+            send_every: 5
+    humidity:
+      name: "${friendly_name} Humidity"
+      id: humidity_sensor
+      unit_of_measurement: "%"
+      accuracy_decimals: 1
+      device_class: humidity
+      state_class: measurement
+      filters:
+        - offset: 0.0  # Kalibrierungs-Offset
+        - sliding_window_average:
+            window_size: 5
+            send_every: 5
+    update_interval: 60s

@@ -1,0 +1,227 @@
+# Raum-Übersicht Dashboard Card
+# Zeigt alle wichtigen Informationen eines Raumes auf einen Blick
+type: vertical-stack
+cards:
+  # Raum Header mit Name und Status
+  - type: horizontal-stack
+    cards:
+      - type: markdown
+        content: |
+          # 🏠 {{ states('input_text.room_name') or 'Wohnzimmer' }}
+          **{{ now().strftime('%H:%M') }}** | **{{ now().strftime('%d.%m.%Y') }}**
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+              color: white;
+              border-radius: 15px 15px 0 0;
+              padding: 10px;
+            }
+      
+      # Raum-Status Indikator
+      - type: glance
+        entities:
+          - entity: binary_sensor.room_occupied
+            name: "Anwesend"
+          - entity: binary_sensor.room_window_open  
+            name: "Fenster"
+          - entity: switch.room_main_light
+            name: "Licht"
+        columns: 3
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(255,255,255,0.1);
+              color: white;
+              border-radius: 0 15px 0 0;
+              border: none;
+            }
+
+  # Klima und Sensoren
+  - type: horizontal-stack
+    cards:
+      # Temperatur und Luftfeuchtigkeit
+      - type: vertical-stack
+        cards:
+          - type: gauge
+            entity: sensor.room_temperature
+            name: "Temperatur"
+            min: 15
+            max: 30
+            severity:
+              green: 18
+              yellow: 25
+              red: 28
+            card_mod:
+              style: |
+                ha-card {
+                  border-radius: 15px;
+                  background: var(--card-background-color);
+                }
+          
+          - type: gauge
+            entity: sensor.room_humidity
+            name: "Luftfeuchtigkeit"  
+            min: 30
+            max: 80
+            severity:
+              green: 40
+              yellow: 60
+              red: 70
+            card_mod:
+              style: |
+                ha-card {
+                  border-radius: 15px;
+                  background: var(--card-background-color);
+                }
+
+      # Luftqualität und weitere Sensoren
+      - type: entities
+        title: "Sensoren"
+        entities:
+          - entity: sensor.room_co2
+            name: "CO₂"
+            icon: "mdi:molecule-co2"
+            card_mod:
+              style: |
+                :host {
+                  --paper-item-icon-color: >
+                    {% set co2 = states('sensor.room_co2') | int %}
+                    {% if co2 < 800 %}green
+                    {% elif co2 < 1200 %}orange  
+                    {% else %}red{% endif %};
+                }
+          - entity: sensor.room_pressure
+            name: "Luftdruck"
+            icon: "mdi:gauge"
+          - entity: sensor.room_light_level
+            name: "Helligkeit"  
+            icon: "mdi:brightness-6"
+          - entity: binary_sensor.room_motion
+            name: "Bewegung"
+            icon: "mdi:motion-sensor"
+        card_mod:
+          style: |
+            ha-card {
+              border-radius: 15px;
+              background: var(--card-background-color);
+            }
+
+  # Beleuchtung Steuerung
+  - type: entities
+    title: "💡 Beleuchtung"
+    entities:
+      - entity: switch.room_main_light
+        name: "Hauptlicht"
+        icon: "mdi:ceiling-light"
+      - entity: light.room_ambient_light
+        name: "Stimmungslicht"
+        icon: "mdi:lightbulb-outline"
+      - entity: light.room_desk_light  
+        name: "Schreibtischlicht"
+        icon: "mdi:desk-lamp"
+      - entity: input_number.room_brightness
+        name: "Helligkeit"
+        icon: "mdi:brightness-percent"
+    card_mod:
+      style: |
+        ha-card {
+          border-radius: 15px;
+          background: var(--card-background-color);
+        }
+
+  # Geräte und Steuerung
+  - type: horizontal-stack
+    cards:
+      # Heizung/Klima
+      - type: thermostat
+        entity: climate.room_heating
+        name: "Heizung"
+        card_mod:
+          style: |
+            ha-card {
+              border-radius: 15px;
+              background: var(--card-background-color);
+            }
+
+      # Weitere Geräte
+      - type: entities
+        title: "🔌 Geräte"
+        entities:
+          - entity: switch.room_tv
+            name: "Fernseher"
+            icon: "mdi:television"
+          - entity: switch.room_sound_system
+            name: "Musikanlage"
+            icon: "mdi:speaker"
+          - entity: cover.room_blinds
+            name: "Jalousien"
+            icon: "mdi:blinds"
+          - entity: fan.room_ceiling_fan
+            name: "Ventilator"
+            icon: "mdi:fan"
+        card_mod:
+          style: |
+            ha-card {
+              border-radius: 15px;
+              background: var(--card-background-color);
+            }
+
+  # Schnellaktionen
+  - type: horizontal-stack
+    cards:
+      - type: button
+        name: "Alles Aus"
+        icon: "mdi:power-off"
+        tap_action:
+          action: call-service
+          service: script.room_all_off
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(45deg, #f44336, #d32f2f);
+              color: white;
+              border-radius: 15px;
+            }
+      
+      - type: button
+        name: "Entspannung"
+        icon: "mdi:sofa" 
+        tap_action:
+          action: call-service
+          service: script.room_relaxation_mode
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(45deg, #4caf50, #388e3c);
+              color: white;
+              border-radius: 15px;
+            }
+      
+      - type: button
+        name: "Arbeiten"
+        icon: "mdi:desk"
+        tap_action:
+          action: call-service
+          service: script.room_work_mode  
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(45deg, #2196f3, #1976d2);
+              color: white;
+              border-radius: 15px;
+            }
+
+      - type: button
+        name: "Schlafen"
+        icon: "mdi:sleep"
+        tap_action:
+          action: call-service
+          service: script.room_sleep_mode
+        card_mod:
+          style: |
+            ha-card {
+              background: linear-gradient(45deg, #9c27b0, #7b1fa2);
+              color: white;
+              border-radius: 15px;
+            }

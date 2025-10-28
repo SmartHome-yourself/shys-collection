@@ -1,0 +1,177 @@
+substitutions:
+  effectCount: "9"
+
+esphome:
+  name: shys-rgbw-smd
+  friendly_name: shys-rgbw-smd
+
+esp8266:
+  board: esp01_1m
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "RGB SMD"
+    password: "12345678"
+  
+captive_portal:
+
+logger:
+  hardware_uart: UART1
+api:
+  encryption:
+    key: !secret ESPHOME_ENCRYPTION_KEY
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+binary_sensor:
+  - platform: gpio
+    name: "Mode Button"
+    pin: GPIO4
+    id: mode_button
+    on_press:
+      then:
+        - script.execute: changeMode
+
+light:
+  - platform: rgbw
+    id: my_light
+    name: "RGB Arbeitsplatte"
+    red: red_out
+    green: green_out
+    blue: blue_out
+    white: white_out
+
+    effects:
+      - random:
+          name: "Slow Random"
+          transition_length: 15s
+          update_interval: 30s
+      - random:
+          name: "Fast Random"
+          transition_length: 3s
+          update_interval: 5s
+      - flicker:
+          name: "Flicker"
+          alpha: 95%
+          intensity: 12.5%
+      - pulse:
+          name: "Slow Pulse"
+          transition_length: 1s
+          update_interval: 2s
+      - strobe:
+          name: "Strobe"
+          colors:
+            - state: true
+              brightness: 100%
+              red: 100%
+              green: 0%
+              blue: 0%
+              duration: 1s
+            - state: true
+              brightness: 100%
+              red: 0%
+              green: 0%
+              blue: 100%
+              duration: 1s
+      - strobe:
+          name: "Green"
+          colors:
+            - state: true
+              brightness: 100%
+              red: 0%
+              green: 100%
+              blue: 0%
+              duration: 10s
+            - state: true
+              brightness: 100%
+              red: 0%
+              green: 100%
+              blue: 0%
+              duration: 10s
+      - strobe:
+          name: "Blue"
+          colors:
+            - state: true
+              brightness: 100%
+              red: 0%
+              green: 0%
+              blue: 100%
+              duration: 10s
+            - state: true
+              brightness: 100%
+              red: 0%
+              green: 0%
+              blue: 100%
+              duration: 10s
+      - strobe:
+          name: "Red"
+          colors:
+            - state: true
+              brightness: 100%
+              red: 100%
+              green: 0%
+              blue: 0%
+              duration: 10s
+            - state: true
+              brightness: 100%
+              red: 100%
+              green: 0%
+              blue: 0%
+              duration: 10s
+      - strobe:
+          name: "Purple"
+          colors:
+            - state: true
+              brightness: 100%
+              red: 70%
+              green: 0%
+              blue: 100%
+              duration: 10s
+            - state: true
+              brightness: 100%
+              red: 70%
+              green: 0%
+              blue: 100%
+              duration: 10s
+
+
+output:
+  - platform: esp8266_pwm
+    id: red_out
+    pin: GPIO14
+  - platform: esp8266_pwm
+    id: green_out
+    pin: GPIO12
+  - platform: esp8266_pwm
+    id: blue_out
+    pin: GPIO13
+  - platform: esp8266_pwm
+    id: white_out
+    pin: GPIO5
+
+
+script:
+  - id: changeMode
+    then:
+      - globals.set: 
+          id: effect
+          value: !lambda |-
+            if(id(effect)+1 > id(effects).size() ){
+              return 0;
+            } else {
+              return id(effect)+1;
+            }
+      - if:
+          condition: 
+            lambda: "return (id(effect) >= id(effects).size());"
+          then:
+            - light.turn_off: my_light
+          else:
+            - light.turn_on: 
+                id: my_light
+                effect: !lambda "return id(effects)[id(effect)];"
+

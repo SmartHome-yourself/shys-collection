@@ -1,0 +1,265 @@
+# DWD Wetter-Warnungen Integration
+# Bezieht offizielle Wetterwarnungen vom Deutschen Wetterdienst
+
+# REST-Sensor für DWD Warnungen
+sensor:
+  - platform: rest
+    name: "DWD Wetterwarnungen"
+    scan_interval: 600  # Alle 10 Minuten prüfen
+    resource_template: >
+      https://opendata.dwd.de/climate_environment/health/alerts/cap/COMMUNEUNION_DWD_STAT/Z_CAP_C_EDZW_LATEST_PVW_STATUS_PREMIUMDWD_COMMUNEUNION_DE.zip
+    value_template: "{{ now().isoformat() }}"
+    json_attributes:
+      - identifier
+      - sender  
+      - sent
+      - status
+      - msgType
+      - category
+      - severity
+      - urgency
+      - event
+      - headline
+      - description
+      - instruction
+      - onset
+      - expires
+    headers:
+      User-Agent: "Home-Assistant"
+    timeout: 30
+
+  # Einfacherer DWD-Sensor über JSON API
+  - platform: rest
+    name: "DWD Warnungen Region"
+    scan_interval: 900  # Alle 15 Minuten
+    resource: "https://opendata.dwd.de/climate_environment/health/alerts/cap/COMMUNEUNION_DWD_STAT/json/warnings.json"
+    value_template: >
+      {% set warnings = value_json.warnings %}
+      {% set region_code = "805315000" %}  # Beispiel: München - anpassen!
+      {% if region_code in warnings %}
+        {{ warnings[region_code] | length }}
+      {% else %}
+        0
+      {% endif %}
+    json_attributes_path: "$.warnings.805315000[0]"  # Erste Warnung für Region
+    json_attributes:
+      - event
+      - headline  
+      - description
+      - severity
+      - urgency
+      - onset
+      - expires
+      - areaDesc
+    unit_of_measurement: "Warnungen"
+
+# Template-Sensoren für benutzerfreundliche Darstellung
+  - platform: template
+    sensors:
+      dwd_warning_level:
+        friendly_name: "Warnstufe"
+        value_template: >
+          {% set severity = state_attr('sensor.dwd_warnungen_region', 'severity') %}
+          {% if severity == 'Minor' %}1
+          {% elif severity == 'Moderate' %}2  
+          {% elif severity == 'Severe' %}3
+          {% elif severity == 'Extreme' %}4
+          {% else %}0{% endif %}
+        icon_template: >
+          {% set level = states('sensor.dwd_warning_level') | int %}
+          {% if level == 0 %}mdi:check-circle
+          {% elif level == 1 %}mdi:information
+          {% elif level == 2 %}mdi:alert  
+          {% elif level == 3 %}mdi:alert-octagon
+          {% elif level == 4 %}mdi:alert-decagram
+          {% else %}mdi:help-circle{% endif %}
+
+      dwd_warning_event:
+        friendly_name: "Wettereignis"
+        value_template: >
+          {{ state_attr('sensor.dwd_warnungen_region', 'event') or 'Keine Warnung' }}
+        icon_template: >
+          {% set event = state_attr('sensor.dwd_warnungen_region', 'event') | lower %}
+          {% if 'regen' in event or 'niederschlag' in event %}mdi:weather-rainy
+          {% elif 'sturm' in event or 'wind' in event %}mdi:weather-windy
+          {% elif 'gewitter' in event %}mdi:weather-lightning
+          {% elif 'schnee' in event %}mdi:weather-snowy
+          {% elif 'eis' in event or 'glätte' in event %}mdi:snowflake
+          {% elif 'hitze' in event %}mdi:weather-sunny-alert
+          {% elif 'frost' in event %}mdi:thermometer-minus
+          {% elif 'nebel' in event %}mdi:weather-fog
+          {% else %}mdi:weather-cloudy{% endif %}
+
+      dwd_warning_headline:
+        friendly_name: "Warnung Überschrift"
+        value_template: >
+          {{ state_attr('sensor.dwd_warnungen_region', 'headline') or 'Keine Warnung aktiv' }}
+
+      dwd_warning_description:
+        friendly_name: "Warnung Beschreibung"
+        value_template: >
+          {{ state_attr('sensor.dwd_warnungen_region', 'description') or 'Keine Details verfügbar' }}
+
+      dwd_warning_expires:
+        friendly_name: "Warnung gültig bis"
+        value_template: >
+          {% set expires = state_attr('sensor.dwd_warnungen_region', 'expires') %}
+          {% if expires %}
+            {{ as_timestamp(expires) | timestamp_custom('%d.%m.%Y %H:%M') }}
+          {% else %}
+            -
+          {% endif %}
+        device_class: timestamp
+
+# Binäre Sensoren für Automatisierungen
+binary_sensor:
+  - platform: template
+    sensors:
+      dwd_warning_active:
+        friendly_name: "Wetterwarnung aktiv"
+        value_template: >
+          {{ states('sensor.dwd_warnungen_region') | int > 0 }}
+        device_class: safety
+
+      dwd_severe_warning:
+        friendly_name: "Schwere Wetterwarnung"
+        value_template: >
+          {{ states('sensor.dwd_warning_level') | int >= 3 }}
+        device_class: safety
+
+      dwd_storm_warning:
+        friendly_name: "Sturmwarnung"
+        value_template: >
+          {% set event = state_attr('sensor.dwd_warnungen_region', 'event') | lower %}
+          {{ 'sturm' in event or 'wind' in event or 'orkan' in event }}
+        device_class: safety
+
+      dwd_rain_warning:
+        friendly_name: "Regenwarnung"
+        value_template: >
+          {% set event = state_attr('sensor.dwd_warnungen_region', 'event') | lower %}
+          {{ 'regen' in event or 'niederschlag' in event or 'starkregen' in event }}
+        device_class: moisture
+
+      dwd_thunder_warning:
+        friendly_name: "Gewitterwarnung"
+        value_template: >
+          {% set event = state_attr('sensor.dwd_warnungen_region', 'event') | lower %}
+          {{ 'gewitter' in event or 'blitz' in event }}
+        device_class: safety
+
+# Automatisierungen für Wetterwarnungen
+automation:
+  - alias: "DWD Wetterwarnung Benachrichtigung"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.dwd_warning_active
+        to: "on"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "⚠️ Wetterwarnung"
+          message: >
+            {{ states('sensor.dwd_warning_headline') }}
+            
+            Gültig bis: {{ states('sensor.dwd_warning_expires') }}
+          data:
+            tag: "weather_warning"
+            group: "weather"
+            actions:
+              - action: "weather_details"
+                title: "Details anzeigen"
+
+  - alias: "DWD Schwere Wetterwarnung"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.dwd_severe_warning
+        to: "on"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "🚨 SCHWERE WETTERWARNUNG"
+          message: >
+            {{ states('sensor.dwd_warning_headline') }}
+            
+            {{ states('sensor.dwd_warning_description')[:200] }}...
+          data:
+            tag: "severe_weather"
+            group: "weather"
+            color: "red"
+            sound: "alarm.wav"
+
+  - alias: "DWD Sturmwarnung Sicherheit"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.dwd_storm_warning
+        to: "on"
+    action:
+      # Sicherheitsmaßnahmen bei Sturm
+      - service: cover.close_cover
+        target:
+          entity_id: all  # Alle Rollläden schließen
+      - service: switch.turn_off
+        target:
+          entity_id: 
+            - switch.garden_lights  # Gartenbeleuchtung aus
+            - switch.patio_heater   # Terrassenheizer aus
+      - service: notify.mobile_app
+        data:
+          title: "🌪️ Sturmwarnung - Sicherheitsmaßnahmen"
+          message: "Rollläden geschlossen, Außengeräte ausgeschaltet"
+
+  - alias: "DWD Warnung abgelaufen"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.dwd_warning_active
+        to: "off"
+        for: "00:05:00"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "✅ Wetterwarnung aufgehoben"
+          message: "Die Wetterwarnung ist nicht mehr aktiv"
+          data:
+            tag: "weather_warning"  # Überschreibt vorherige Warnung
+
+# Text-to-Speech Ansagen (optional)
+script:
+  announce_weather_warning:
+    alias: "Wetterwarnung ansagen"
+    sequence:
+      - condition: state
+        entity_id: binary_sensor.dwd_warning_active
+        state: "on"
+      - service: tts.google_translate_say
+        target:
+          entity_id: media_player.home_speakers
+        data:
+          message: >
+            Achtung, eine Wetterwarnung ist aktiv: {{ states('sensor.dwd_warning_headline') }}. 
+            Die Warnung gilt bis {{ states('sensor.dwd_warning_expires') }}.
+          language: "de"
+
+# Input Boolean für Benachrichtigungs-Einstellungen
+input_boolean:
+  dwd_notifications_enabled:
+    name: "DWD Benachrichtigungen aktiviert"
+    initial: true
+    icon: "mdi:bell"
+
+  dwd_tts_enabled:
+    name: "DWD Sprachansagen aktiviert"
+    initial: false
+    icon: "mdi:volume-high"
+
+# Input Select für Benachrichtigungs-Level
+input_select:
+  dwd_notification_level:
+    name: "Benachrichtigungs-Stufe"
+    options:
+      - "Alle Warnungen"
+      - "Ab Stufe 2 (Moderate)"
+      - "Ab Stufe 3 (Severe)"
+      - "Nur Stufe 4 (Extreme)"
+    initial: "Ab Stufe 2 (Moderate)"
+    icon: "mdi:alert-octagon"

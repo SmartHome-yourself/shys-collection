@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name Hue_Ambience_clone-rescue)(type Legacy)(uri ${KIPRJMOD}/Hue_Ambience_clone-rescue.lib)(options "")(descr ""))
+)

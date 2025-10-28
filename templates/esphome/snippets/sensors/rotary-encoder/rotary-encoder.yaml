@@ -1,0 +1,123 @@
+# Rotary Encoder (KY-040 oder ähnlich)
+# Bietet Rotationserkennung und Drucktasten-Funktionalität
+sensor:
+  - platform: rotary_encoder
+    name: "${friendly_name} Rotary Position"
+    id: rotary_encoder
+    pin_a: 
+      number: GPIO18
+      mode: INPUT_PULLUP
+    pin_b: 
+      number: GPIO19  
+      mode: INPUT_PULLUP
+    resolution: 4  # Impulse pro Schritt (1, 2, oder 4)
+    min_value: -100
+    max_value: 100
+    publish_initial_value: true
+    restore_mode: RESTORE_DEFAULT_VALUE
+    filters:
+      - multiply: 1.0  # Skalierungsfaktor für Feinabstimmung
+    on_value:
+      then:
+        - logger.log: 
+            format: "Rotary encoder: %.1f"
+            args: ['x']
+    on_clockwise:
+      then:
+        - logger.log: "Clockwise rotation detected"
+    on_anticlockwise:
+      then:
+        - logger.log: "Counter-clockwise rotation detected"
+
+# Drucktaste des Rotary Encoders
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO5
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "${friendly_name} Rotary Button"
+    id: rotary_button
+    filters:
+      - delayed_on: 50ms  # Entprellen
+      - delayed_off: 50ms
+    on_press:
+      then:
+        - logger.log: "Rotary button pressed"
+        # Encoder bei Tastendruck auf Null zurücksetzen
+        - sensor.rotary_encoder.set_value:
+            id: rotary_encoder
+            value: 0
+    on_click:
+      - min_length: 50ms
+        max_length: 1s
+        then:
+          - logger.log: "Short click detected"
+    on_double_click:
+      - min_length: 50ms
+        max_length: 1s  
+        then:
+          - logger.log: "Double click detected"
+    on_multi_click:
+      - timing:
+          - ON for at most 1s
+          - OFF for at most 1s
+          - ON for at most 1s
+          - OFF for at least 0.2s
+        then:
+          - logger.log: "Triple click detected"
+
+# Optional: Number-Komponente für Home Assistant Steuerung
+number:
+  - platform: template
+    name: "${friendly_name} Volume"
+    id: volume_control
+    min_value: 0
+    max_value: 100
+    initial_value: 50
+    step: 1
+    unit_of_measurement: "%"
+    mode: slider
+    optimistic: true
+    lambda: |-
+      // Encoder-Wert (-100 bis 100) auf Lautstärke (0 bis 100) mappen
+      float encoder_val = id(rotary_encoder).state;
+      return (encoder_val + 100) / 2.0;
+    set_action:
+      then:
+        # Lautstärke zurück auf Encoder-Bereich mappen
+        - sensor.rotary_encoder.set_value:
+            id: rotary_encoder
+            value: !lambda 'return (x * 2.0) - 100;'
+
+# Optional: Licht-Dimmer Beispiel
+light:
+  - platform: monochromatic
+    output: dimmer_output
+    name: "${friendly_name} Dimmer"
+    id: rotary_light
+    restore_mode: RESTORE_DEFAULT_OFF
+
+output:
+  - platform: ledc
+    id: dimmer_output
+    pin: GPIO23
+    frequency: 1000Hz
+
+# Script zum Aktualisieren der Lichthelligkeit basierend auf Encoder
+script:
+  - id: update_light_brightness
+    then:
+      - lambda: |-
+          float encoder_val = id(rotary_encoder).state;
+          float brightness = (encoder_val + 100) / 200.0;  // Auf 0.0-1.0 mappen
+          brightness = max(0.0f, min(1.0f, brightness));   // Auf gültigen Bereich begrenzen
+          
+          auto call = id(rotary_light).turn_on();
+          call.set_brightness(brightness);
+          call.perform();
+
+# Licht aktualisieren wenn Encoder sich ändert
+on_boot:
+  then:
+    - script.execute: update_light_brightness

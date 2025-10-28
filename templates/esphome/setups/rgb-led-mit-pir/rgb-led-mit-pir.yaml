@@ -1,0 +1,89 @@
+esphome:
+  name: rgb-led-mit-pir
+  platform: ESP8266
+  board: nodemcuv2
+
+
+wifi:
+  ssid: !secret WLanSSID
+  password: !secret WLanPassword
+
+  ap:
+    ssid: "RGB-LED-PIR"
+    password: "gWef1LGFbEILB"
+
+captive_portal:
+logger:
+api:
+ota:
+
+sun:
+  latitude: 51.158672°
+  longitude: 7.196742°
+
+time:
+  - platform: homeassistant
+    id: local_time
+
+
+binary_sensor:
+  - platform: gpio
+    pin: D1
+    name: "Bewegungsmelder"
+    device_class: motion
+    id: pir
+    on_press:
+      then: 
+        - if:
+            condition:
+              - sun.is_below_horizon:
+            then:
+              - script.execute: switch_rgb_led_script
+
+light:
+  - platform: rgb
+    name: "RGB Led"
+    red: rgb_led_red
+    green: rgb_led_green
+    blue: rgb_led_blue
+    id: rgb_led
+
+output:
+  - platform: esp8266_pwm
+    id: rgb_led_red
+    pin: D5
+  - platform: esp8266_pwm
+    id: rgb_led_green
+    pin: D6
+  - platform: esp8266_pwm
+    id: rgb_led_blue
+    pin: D2
+
+
+# Helper um per HA das Abschalten per timeout generell zu verhindern
+switch:
+  - platform: gpio
+    pin: D3
+    name: "LEDs dauerhaft an"
+    id: leds_daueran
+    on_turn_on:
+      - light.turn_on: rgb_led
+    on_turn_off:
+      - light.turn_off: rgb_led
+
+
+# Script mit Mode=restart, damit der Timeout bei jeder erneuten Bewegung zurückgesetzt wird.
+# Wenn also das Licht eingeschaltet wurde, aber in den 2 Minuten delay erneut eine Bewegung erkannt wird, 
+# wird das Script abgebrochen und neu gestartet, wodurch die 2 Minuten Wartezeit erneut beginnen
+script:
+- id: switch_rgb_led_script
+  mode: restart
+  
+  then:
+    - light.turn_on: rgb_led
+    - delay: 2min
+    - if:
+        condition:
+          switch.is_off: leds_daueran
+        then:
+          - light.turn_off: rgb_led

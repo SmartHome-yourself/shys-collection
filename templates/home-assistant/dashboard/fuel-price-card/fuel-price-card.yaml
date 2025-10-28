@@ -1,0 +1,220 @@
+type: vertical-stack
+cards:
+  - type: horizontal-stack
+    cards:
+      - type: markdown
+        content: ' '
+        style:
+          .: |
+            ha-card {
+              background-color: transparent !important;
+              box-shadow: none !important;
+            }
+      - type: horizontal-stack
+        cards:
+          - type: picture
+            image: /local/tankstation_logos/sprinter.png
+            style:
+              .: |
+                ha-card {
+                  background-color: transparent !important;
+                  box-shadow: none !important;
+                  margin-bottom: 5px;
+                  margin-left: 0px;
+                  margin-right: 0px;
+                }
+                ha-card img{
+                  height: 43px;
+                  width: 70px;
+                  margin: auto;
+                }
+          - type: picture
+            image: /local/tankstation_logos/sharan.png
+            style:
+              .: |
+                ha-card {
+                  padding: auto;
+                  background-color: transparent !important;
+                  box-shadow: none !important;
+                  margin-bottom: 5px;
+                  margin-left: 0px;
+                  margin-right: 0px;
+                }
+                ha-card img{
+                  height: 43px;
+                  width: 70px;
+                  margin: auto;
+                }
+  - type: horizontal-stack
+    cards:
+      - type: markdown
+        content: |
+          <table>
+            <tr>
+              <td width="50px;">     
+                <img src = '/local/tankstation_logos/buettner.png' align='top' height='40'></img>
+              </td>
+              <td>
+                Büttner | Rosenstrasse
+              </td>
+            </tr>
+          </table>
+        style:
+          .: |
+            ha-card {
+              max-height:51px;
+              
+              padding-top: 0px;
+              background-color: transparent !important;
+              box-shadow: none !important;
+              }
+            ha-markdown {
+              font-size: 90%;
+              font-weight: 100;
+              color: white;
+            }
+            .no-header {
+              padding: 0px !important;
+            }
+      - type: horizontal-stack
+        cards:
+          - type: custom:badge-card
+            badges:
+              - entity: sensor.tankerkoenig_shop_chill_diesel
+                name: ' '
+                style: |
+                  :host {
+                    font-weight: bold;
+                    --label-badge-text-color: white;
+                    --label-badge-red: black;
+                    --label-badge-background-color: gray;
+                    --ha-label-badge-label-color: white;
+                  }
+          - type: custom:badge-card
+            badges:
+              - entity: sensor.tankerkoenig_shop_chill_e5
+                name: ' '
+                style: |
+                  :host {
+                    font-weight: bold;
+                    --label-badge-text-color: white;
+                    --label-badge-red: black;
+                    --label-badge-background-color: red;
+                    --ha-label-badge-label-color: white;
+                  }
+  - type: horizontal-stack
+    cards:
+      - type: markdown
+        content: |
+          <table>
+            <tr>
+              <td width="50px;">     
+                <img src = '/local/tankstation_logos/score.png' align='top' height='40'></img>
+              </td>
+              <td>
+                Score | Burgstrasse
+              </td>
+            </tr>
+          </table>
+        style:
+          .: |
+            ha-card {
+              max-height:51px;
+              
+              padding-top: 0px;
+              background-color: transparent !important;
+              box-shadow: none !important;
+              }
+            ha-markdown {
+              font-size: 90%;
+              font-weight: 100;
+              color: white;
+            }
+            .no-header {
+              padding: 0px !important;
+            }
+      - type: horizontal-stack
+        cards:
+          - type: custom:badge-card
+            badges:
+              - entity: sensor.tankerkoenig_marienhafe_diesel
+                name: ' '
+                style: |
+                  :host {
+                    font-weight: bold;
+                    --label-badge-text-color: white;
+                    --label-badge-red: black;
+                    --label-badge-background-color: gray;
+                    --ha-label-badge-label-color: white;
+                  }
+          - type: custom:badge-card
+            badges:
+              - entity: sensor.tankerkoenig_marienhafe_e5
+                name: ' '
+                style: |
+                  :host {
+                    font-weight: bold;
+                    --label-badge-text-color: white;
+                    --label-badge-text-weight: bold;
+                    --label-badge-red: black;
+                    --label-badge-background-color: red;
+                    --ha-label-badge-label-color: white;
+                  }
+  - type: horizontal-stack
+    cards:
+      - type: markdown
+        content: |
+          <table>
+            <tr>
+              <td width="50px;">     
+                <img src = '/local/tankstation_logos/aral.png' align='top' height='40'></img>
+              </td>
+              <td>
+                Aral | Norddeicher Strasse
+              </td>
+            </tr>
+          </table>
+        style:
+          .: |
+            ha-card {
+              max-height:51px;
+              
+              padding-top: 0px;
+              background-color: transparent !important;
+              box-shadow: none !important;
+              }
+            ha-markdown {
+              font-size: 85%;
+              font-weight: 100;
+              color: white;
+            }
+            .no-header {
+              padding: 0px !important;
+            }
+      - type: horizontal-stack
+        cards:
+          - type: custom:badge-card
+            badges:
+              - entity: sensor.tankerkoenig_aral_tankstelle_diesel
+                name: ' '
+                style: |
+                  :host {
+                    font-weight: bold;
+                    --label-badge-text-color: white;
+                    --label-badge-red: black;
+                    --label-badge-background-color: gray;
+                    --ha-label-badge-label-color: white;
+                  }
+          - type: custom:badge-card
+            badges:
+              - entity: sensor.tankerkoenig_aral_tankstelle_e5
+                name: ' '
+                style: |
+                  :host {
+                    font-weight: bold;
+                    --label-badge-text-color: white;
+                    --label-badge-text-weight: bold;
+                    --label-badge-red: black;
+                    --label-badge-background-color: red;
+                    --ha-label-badge-label-color: white;
+                  }

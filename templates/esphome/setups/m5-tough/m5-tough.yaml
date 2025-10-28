@@ -1,0 +1,157 @@
+substitutions:
+  name: "m5-tough"
+  friendly_name: "M5 Tough"
+  m5_textsensor_id: "m5_textsensor_id"   # zum reinreichen des shys_m5_tough-Textsensors
+  
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+  project:
+    name: smarthomeyourself.m5_tough
+    version: "1.0"
+    
+  platformio_options:
+    board: esp32dev
+    framework: arduino
+
+    lib_deps:
+      - WiFi
+      - SPI
+      - FS
+      - Wire
+      - EEPROM
+      - m5stack/M5Unified @ 0.0.7
+
+  on_boot:
+    priority: 0
+    then:
+      - binary_sensor.template.publish:
+          id: logged_in
+          state: off
+      - sensor.template.publish:
+          id: failed_logins
+          state: 0
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/SmartHome-yourself/m5-tough-touchmenu-for-esphome
+      ref: main
+    components: [shys_m5_tough]
+ 
+dashboard_import:
+  package_import_url: github://SmartHome-yourself/m5-tough-touchmenu-for-esphome/shys-m5-tough-touchmenu.yaml@main
+  import_full_config: false
+
+esp32:
+  board: esp32dev
+
+logger:
+  level: DEBUG
+  logs:
+    sensor: INFO
+    binary_sensor: INFO
+    text_sensor: INFO
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: ${wifi_ssid}
+  password: ${wifi_password}
+  ap:
+    password: "12345678"
+
+improv_serial:
+
+captive_portal:
+
+binary_sensor:
+  - platform: template
+    name: "${friendly_name} Angemeldet"
+    id: logged_in
+
+  - platform: template
+    name: "${friendly_name} Display on"
+    id: display_on
+
+sensor:
+  - platform: template
+    name: "${friendly_name} Failed Logins"
+    id: failed_logins
+    accuracy_decimals: 0
+    unit_of_measurement: "Fehler"
+
+
+text_sensor:
+
+  - platform: template
+    id: m5_state_tpl
+    name: ${friendly_name} Status
+    lambda: |-
+      return {id(${m5_textsensor_id}).state};
+    update_interval: 500ms
+
+    on_value:
+      then:
+        - if:
+            condition:
+              text_sensor.state:
+                id: m5_state_tpl
+                state: "Login OK"
+            then:
+              - binary_sensor.template.publish:
+                  id: logged_in
+                  state: on
+              - sensor.template.publish:
+                  id: failed_logins
+                  state: 0
+
+        - if:
+            condition:
+              text_sensor.state:
+                id: m5_state_tpl
+                state: "Login failed"
+            then:
+              - lambda: "id(failed_logins).publish_state( id(failed_logins).state + 1 );"
+
+        - if:
+            condition:
+              - or:
+                  - text_sensor.state:
+                      id: m5_state_tpl
+                      state: "Login failed"
+                  - text_sensor.state:
+                      id: m5_state_tpl
+                      state: "Screen locked"
+                  - text_sensor.state:
+                      id: m5_state_tpl
+                      state: "Display off"
+            then:
+              - binary_sensor.template.publish:
+                  id: logged_in
+                  state: OFF
+
+        - if:
+            condition:
+              - or:
+                  - text_sensor.state:
+                      id: m5_state_tpl
+                      state: "Display on"
+            then:
+              - binary_sensor.template.publish:
+                  id: display_on
+                  state: ON
+
+        - if:
+            condition:
+              - or:
+                  - text_sensor.state:
+                      id: m5_state_tpl
+                      state: "Display off"
+            then:
+              - binary_sensor.template.publish:
+                  id: display_on
+                  state: OFF

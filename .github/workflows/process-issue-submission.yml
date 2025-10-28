@@ -1,0 +1,437 @@
+name: Process Issue ZIP Submission
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  process-zip:
+    # Run if issue contains .zip OR if comment contains .zip
+    if: |
+      (github.event_name == 'issues' && contains(github.event.issue.body, '.zip')) ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '.zip'))
+    runs-on: ubuntu-latest
+    name: "Process: ${{ github.event.issue.title }}"
+    
+    steps:
+    - name: Update Issue - Processing Started
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.PAT_TOKEN }}
+        script: |
+          const issueNumber = context.issue.number;
+          await github.rest.issues.createComment({
+            issue_number: issueNumber,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `🚀 **ZIP-Datei wird verarbeitet...**\n\n⏳ Workflow gestartet - ZIP wird heruntergeladen und validiert.\n\n🔗 [Workflow-Status anzeigen](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${{ github.run_id }})`
+          });
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.PAT_TOKEN }}
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tools/validator/requirements.txt
+
+    - name: Validate issue title
+      run: |
+        ISSUE_TITLE="${{ github.event.issue.title }}"
+        
+        echo "🔍 Checking issue title: '$ISSUE_TITLE'"
+        
+        if [ -z "$ISSUE_TITLE" ]; then
+          echo "❌ Issue title is empty"
+          exit 1
+        fi
+        
+        if [ "$ISSUE_TITLE" = "Hier dein Projekt-Name" ]; then
+          echo "❌ Standard title was not changed"
+          
+          # Comment on issue
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.PAT_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
+            -d '{"body":"❌ **Titel muss geändert werden!**\n\nBitte ändere den Titel von \"Hier dein Projekt-Name\" zu deinem echten Projektnamen.\n\n**Beispiele:**\n- `Temperatursensor mit OLED Display`\n- `Smart Doorbell mit ESP32`\n- `Wetterstation Hardware`\n\n## 📤 Nächste Schritte:\n1. Ändere den Issue-Titel oben\n2. Lade deine ZIP-Datei **als Kommentar** unter diesem Issue hoch\n3. Die Verarbeitung startet dann automatisch erneut! 🚀"}'
+          
+          exit 1
+        fi
+        
+        echo "✅ Issue title is valid: $ISSUE_TITLE"
+
+    - name: Extract ZIP information
+      id: extract-zip
+      run: |
+        # Determine the source body (issue or comment)
+        if [ "${{ github.event_name }}" = "issue_comment" ]; then
+          BODY="${{ github.event.comment.body }}"
+          echo "📝 Processing ZIP from comment"
+        else
+          BODY="${{ github.event.issue.body }}"
+          echo "📝 Processing ZIP from issue body"
+        fi
+        
+        # Extract ZIP download URL
+        ZIP_URL=$(echo "$BODY" | grep -o 'https://github\.com/[^/]*/[^/]*/files/[^)]*' | head -1)
+        
+        if [ -z "$ZIP_URL" ]; then
+          echo "❌ No GitHub files URL found, trying ZIP pattern..."
+          ZIP_URL=$(echo "$BODY" | grep -o 'https://[^)]*\.zip' | head -1)
+        fi
+        
+        if [ -z "$ZIP_URL" ]; then
+          echo "❌ No ZIP file found"
+          exit 1
+        fi
+        
+        echo "✅ Found ZIP URL: $ZIP_URL"
+        echo "zip_url=$ZIP_URL" >> $GITHUB_OUTPUT
+        
+        # Extract project type from issue body
+        ISSUE_BODY="${{ github.event.issue.body }}"
+        
+        if [[ "$ISSUE_BODY" == *"esphome-snippet"* ]]; then
+          echo "project_type=esphome-snippet" >> $GITHUB_OUTPUT
+        elif [[ "$ISSUE_BODY" == *"esphome-setup"* ]]; then
+          echo "project_type=esphome-setup" >> $GITHUB_OUTPUT
+        elif [[ "$ISSUE_BODY" == *"home-assistant"* ]]; then
+          echo "project_type=home-assistant" >> $GITHUB_OUTPUT
+        elif [[ "$ISSUE_BODY" == *"hardware"* ]]; then
+          echo "project_type=hardware" >> $GITHUB_OUTPUT
+        elif [[ "$ISSUE_BODY" == *"nodered"* ]]; then
+          echo "project_type=nodered" >> $GITHUB_OUTPUT
+        else
+          echo "project_type=unknown" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Extract form data
+      id: form-data
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const issueBody = `${{ github.event.issue.body }}`;
+          const projectType = '${{ steps.extract-zip.outputs.project_type }}';
+          
+          let category = '';
+          
+          // Extract category for project types that need it
+          if (projectType === 'esphome-snippet') {
+            if (issueBody.includes('actuators')) category = 'actuators';
+            else if (issueBody.includes('helpers')) category = 'helpers';
+            else if (issueBody.includes('networks')) category = 'networks';
+            else if (issueBody.includes('sensors')) category = 'sensors';
+            else category = 'actuators';
+          } else if (projectType === 'home-assistant') {
+            if (issueBody.includes('integrations')) category = 'integrations';
+            else if (issueBody.includes('dashboard')) category = 'dashboard';
+            else if (issueBody.includes('blueprints')) category = 'blueprints';
+            else category = 'integrations';
+          }
+          
+          core.setOutput('category', category);
+
+    - name: Download ZIP
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.PAT_TOKEN }}
+        script: |
+          const fs = require('fs');
+          const https = require('https');
+          const zipUrl = '${{ steps.extract-zip.outputs.zip_url }}';
+          console.log('📥 Downloading ZIP from:', zipUrl);
+          
+          try {
+            // GitHub user-attachments require special handling
+            const response = await github.request('GET ' + zipUrl, {
+              headers: {
+                'Accept': 'application/octet-stream'
+              },
+              request: {
+                redirect: 'follow'
+              }
+            });
+            
+            let buffer;
+            if (response.data instanceof ArrayBuffer) {
+              buffer = Buffer.from(response.data);
+            } else if (Buffer.isBuffer(response.data)) {
+              buffer = response.data;
+            } else {
+              // Try direct fetch as fallback
+              const fetchResponse = await fetch(zipUrl, {
+                headers: {
+                  'Authorization': `token ${{ secrets.PAT_TOKEN }}`,
+                  'Accept': 'application/octet-stream',
+                  'User-Agent': 'GitHub-Actions'
+                },
+                redirect: 'follow'
+              });
+              
+              if (!fetchResponse.ok) {
+                throw new Error(`HTTP ${fetchResponse.status}: ${fetchResponse.statusText}`);
+              }
+              
+              const arrayBuffer = await fetchResponse.arrayBuffer();
+              buffer = Buffer.from(arrayBuffer);
+            }
+            
+            if (buffer.length < 100) {
+              throw new Error('Download failed - file too small (less than 100 bytes)');
+            }
+            
+            fs.writeFileSync('submission.zip', buffer);
+            console.log(`✅ ZIP file saved (${buffer.length} bytes)`);
+            
+          } catch (error) {
+            console.error('❌ Download failed:', error.message);
+            console.error('Full error:', error);
+            
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `❌ **ZIP-Download fehlgeschlagen**\n\n**Fehler:** ${error.message}\n\n💡 **Problem:** GitHub user-attachments sind manchmal schwer für Workflows zugänglich.\n\n## 🔧 Lösung:\n\n**Bitte lade deine ZIP-Datei als **KOMMENTAR** hier unter diesem Issue hoch (nicht über das Formular):**\n\n1. Klicke unten auf "Add a comment"\n2. Ziehe deine ZIP-Datei in das Kommentarfeld\n3. Sende den Kommentar ab\n4. Die Verarbeitung startet automatisch! 🚀`
+            });
+            
+            process.exit(1);
+          }
+
+    - name: Extract ZIP
+      id: extract-project
+      run: |
+        unzip -o submission.zip -d extracted/
+        
+        # Find project directory
+        PROJECT_DIR=$(find extracted/ -maxdepth 1 -type d ! -name "extracted" | head -1)
+        
+        if [ -z "$PROJECT_DIR" ]; then
+          echo "❌ No project directory found in ZIP"
+          exit 1
+        fi
+        
+        echo "📁 Project directory: $PROJECT_DIR"
+        echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_OUTPUT
+        
+        # Extract slug
+        SLUG=$(basename "$PROJECT_DIR")
+        echo "slug=$SLUG" >> $GITHUB_OUTPUT
+
+    - name: Prepare validation structure
+      run: |
+        PROJECT_DIR="${{ steps.extract-project.outputs.PROJECT_DIR }}"
+        PROJECT_TYPE="${{ steps.extract-zip.outputs.project_type }}"
+        CATEGORY="${{ steps.form-data.outputs.category }}"
+        SLUG="${{ steps.extract-project.outputs.slug }}"
+        
+        # Create templates structure for validation
+        mkdir -p validation/templates
+        
+        # Copy to correct path based on project type
+        case $PROJECT_TYPE in
+          "esphome-snippet")
+            mkdir -p "validation/templates/esphome/snippets/$CATEGORY"
+            cp -r "$PROJECT_DIR" "validation/templates/esphome/snippets/$CATEGORY/$SLUG"
+            ;;
+          "esphome-setup")
+            mkdir -p "validation/templates/esphome/setups"
+            cp -r "$PROJECT_DIR" "validation/templates/esphome/setups/$SLUG"
+            ;;
+          "home-assistant")
+            mkdir -p "validation/templates/home-assistant/$CATEGORY"
+            cp -r "$PROJECT_DIR" "validation/templates/home-assistant/$CATEGORY/$SLUG"
+            ;;
+          "hardware")
+            mkdir -p "validation/templates/hardware"
+            cp -r "$PROJECT_DIR" "validation/templates/hardware/$SLUG"
+            ;;
+          "nodered")
+            mkdir -p "validation/templates/nodered/flows"
+            cp -r "$PROJECT_DIR" "validation/templates/nodered/flows/$SLUG"
+            ;;
+        esac
+
+    - name: Run Validator
+      id: validate
+      continue-on-error: true
+      run: |
+        echo "🔍 Running validator..."
+        python tools/validator/validate.py validation/ --github > validation_output.txt
+        VALIDATION_RESULT=$?
+        
+        if [ $VALIDATION_RESULT -ne 0 ]; then
+          echo "validation_failed=true" >> $GITHUB_OUTPUT
+          echo "❌ Validation failed"
+        else
+          echo "validation_failed=false" >> $GITHUB_OUTPUT
+          echo "✅ Validation passed"
+        fi
+        
+        exit 0
+
+    - name: Comment validation errors
+      if: steps.validate.outputs.validation_failed == 'true'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require('fs');
+          const validationOutput = fs.readFileSync('validation_output.txt', 'utf8');
+          
+          await github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: validationOutput
+          });
+
+    - name: Stop if validation failed
+      if: steps.validate.outputs.validation_failed == 'true'
+      run: |
+        echo "❌ Validation failed - stopping workflow"
+        exit 1
+
+    - name: Determine target path
+      id: target-path
+      run: |
+        PROJECT_TYPE="${{ steps.extract-zip.outputs.project_type }}"
+        SLUG="${{ steps.extract-project.outputs.slug }}"
+        CATEGORY="${{ steps.form-data.outputs.category }}"
+        
+        case $PROJECT_TYPE in
+          "esphome-snippet")
+            TARGET_PATH="templates/esphome/snippets/$CATEGORY/$SLUG"
+            ;;
+          "esphome-setup")
+            TARGET_PATH="templates/esphome/setups/$SLUG"
+            ;;
+          "home-assistant")
+            TARGET_PATH="templates/home-assistant/$CATEGORY/$SLUG"
+            ;;
+          "hardware")
+            TARGET_PATH="templates/hardware/$SLUG"
+            ;;
+          "nodered")
+            TARGET_PATH="templates/nodered/flows/$SLUG"
+            ;;
+        esac
+        
+        echo "target_path=$TARGET_PATH" >> $GITHUB_OUTPUT
+
+    - name: Create branch and commit
+      run: |
+        TARGET_PATH="${{ steps.target-path.outputs.target_path }}"
+        SLUG="${{ steps.extract-project.outputs.slug }}"
+        PROJECT_DIR="${{ steps.extract-project.outputs.PROJECT_DIR }}"
+        PROJECT_TYPE="${{ steps.extract-zip.outputs.project_type }}"
+        CATEGORY="${{ steps.form-data.outputs.category }}"
+        
+        # Create branch name
+        if [ -n "$CATEGORY" ]; then
+          BRANCH_NAME="submission/$PROJECT_TYPE/$CATEGORY/$SLUG-$(date +%Y%m%d-%H%M%S)"
+        else
+          BRANCH_NAME="submission/$PROJECT_TYPE/$SLUG-$(date +%Y%m%d-%H%M%S)"
+        fi
+        
+        echo "📁 Branch name: $BRANCH_NAME"
+        
+        # Configure git
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git checkout -b "$BRANCH_NAME"
+        
+        # Create target directory and copy files
+        mkdir -p "$TARGET_PATH"
+        cp -r "$PROJECT_DIR"/* "$TARGET_PATH/"
+        
+        # Commit
+        git add "$TARGET_PATH"
+        git commit -m "Add $SLUG submission from Issue #${{ github.event.issue.number }} by @${{ github.event.issue.user.login }}"
+        
+        # Push
+        git push origin "$BRANCH_NAME"
+        
+        echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
+    - name: Create Pull Request
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const branchName = process.env.BRANCH_NAME;
+          const targetPath = '${{ steps.target-path.outputs.target_path }}';
+          const slug = '${{ steps.extract-project.outputs.slug }}';
+          const issueNumber = ${{ github.event.issue.number }};
+          
+          const pr = await github.rest.pulls.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `Add ${slug} submission`,
+            head: branchName,
+            base: 'main',
+            body: `## 📁 Submission Details
+            
+            - **Project**: ${slug}
+            - **Type**: ${{ steps.extract-zip.outputs.project_type }}
+            - **Path**: \`${targetPath}\`
+            - **Source**: Issue #${issueNumber}
+            - **Submitted by**: @${{ github.event.issue.user.login }}
+            
+            ## ✅ Validierung erfolgreich
+            
+            Das Projekt wurde bereits validiert und hat alle Prüfungen bestanden!
+            
+            ## 📝 Nächste Schritte
+            
+            1. Manuelle Review des Codes
+            2. Nach Freigabe: Merge in main
+            
+            ---
+            
+            Closes #${issueNumber}`
+          });
+          
+          console.log(`Created PR #${pr.data.number}: ${pr.data.html_url}`);
+          
+          // Comment on issue
+          await github.rest.issues.createComment({
+            issue_number: issueNumber,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## ✅ **Projekt erfolgreich validiert und eingereicht!**
+            
+            Dein Projekt **${slug}** hat alle Validierungen bestanden! 🎉
+            
+            **Details:**
+            - 📁 Zielordner: \`${targetPath}\`
+            - 🔗 Pull Request: #${pr.data.number}
+            - ✅ Alle Prüfungen bestanden
+            
+            **Nächste Schritte:**
+            1. ⏳ Manuelle Review durch das Team
+            2. ✅ Nach Freigabe wird dein Projekt in die Collection aufgenommen
+            
+            **Vielen Dank für deinen Beitrag zur Community!** 🚀`
+          });
+
+    - name: Cleanup
+      if: always()
+      run: |
+        rm -rf extracted/ validation/ validation_output.txt submission.zip 2>/dev/null || true
+

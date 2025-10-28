@@ -1,0 +1,71 @@
+# Servo Motor Steuerung
+# Standard 180° Hobby-Servo (SG90, MG996R, etc.)
+servo:
+  - id: servo_motor
+    output: servo_pwm
+    auto_detach_time: 1s  # Strom sparen durch Abschalten nach Bewegung
+    transition_length: 1s  # Dauer der sanften Bewegung
+
+# PWM-Ausgang für Servo-Steuerung
+output:
+  - platform: ledc
+    id: servo_pwm
+    pin: GPIO18
+    frequency: 50Hz  # Standard Servo-Frequenz
+    channel: 0
+
+# Number-Komponente für Home Assistant Steuerung
+number:
+  - platform: template
+    name: "${friendly_name} Servo Position"
+    id: servo_position
+    min_value: -100
+    max_value: 100
+    initial_value: 0
+    step: 5
+    unit_of_measurement: "%"
+    mode: slider
+    optimistic: true
+    set_action:
+      then:
+        - servo.write:
+            id: servo_motor
+            level: !lambda 'return x / 100.0;'
+        - logger.log: 
+            format: "Servo moved to %.1f%%"
+            args: [ 'x' ]
+
+# Vordefinierte Positionen als Buttons
+button:
+  - platform: template
+    name: "${friendly_name} Servo Center"
+    icon: "mdi:crosshairs"
+    on_press:
+      - servo.write:
+          id: servo_motor
+          level: 0.0  # Mittelposition
+      - number.set:
+          id: servo_position
+          value: 0
+
+  - platform: template
+    name: "${friendly_name} Servo Left"
+    icon: "mdi:arrow-left"
+    on_press:
+      - servo.write:
+          id: servo_motor
+          level: -1.0  # Ganz links
+      - number.set:
+          id: servo_position
+          value: -100
+
+  - platform: template
+    name: "${friendly_name} Servo Right"
+    icon: "mdi:arrow-right"
+    on_press:
+      - servo.write:
+          id: servo_motor
+          level: 1.0  # Ganz rechts
+      - number.set:
+          id: servo_position
+          value: 100

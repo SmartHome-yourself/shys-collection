@@ -1,0 +1,42 @@
+esphome:
+  name: rgb_youtube
+  platform: ESP8266
+  board: nodemcuv2
+
+wifi:
+  ssid: !secret WLanSSID
+  password: !secret WLanPassword
+
+  ap:
+    ssid: "RGB Buero"
+    password: "gWef1LCbEILB"
+
+captive_portal:
+logger:
+
+api:
+  password: !secret HA_API_Password
+ota:
+  password: !secret HA_OTA_Password
+
+light:
+  - platform: rgb
+    name: "SmartHome yourself RGB"
+    red: rgb_shys_1
+    green: rgb_shys_2
+    blue: rgb_shys_3
+    white: rgb_shys_4
+
+output:
+  - platform: esp8266_pwm
+    id: rgb_shys_1
+    pin: D5
+  - platform: esp8266_pwm
+    id: rgb_shys_2
+    pin: D6
+  - platform: esp8266_pwm
+    id: rgb_shys_3
+    pin: D2
+  - platform: esp8266_pwm
+    id: rgb_shys_4
+    pin: D1

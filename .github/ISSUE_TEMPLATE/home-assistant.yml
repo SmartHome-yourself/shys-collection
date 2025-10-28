@@ -1,0 +1,71 @@
+name: Home Assistant Projekt einreichen
+description: Home Assistant Integrationen, Dashboards oder Blueprints zur Collection beitragen
+title: "Hier dein Projekt-Name"
+labels: ["home-assistant", "integration"]
+body:
+  - type: dropdown
+    id: category
+    attributes:
+      label: "Kategorie"
+      description: "Wähle die passende Kategorie für dein Home Assistant Projekt"
+      options:
+        - "integrations"
+        - "dashboard"
+        - "blueprints"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "ZIP-Datei hochladen"
+      description: "Ziehe deine ZIP-Datei hier hinein oder füge sie als Anhang hinzu"
+      placeholder: "ZIP-Datei hier hineinziehen oder als Anhang hinzufügen..."
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ## 📁 ZIP-Upload
+        
+        **Wichtig:** Lade dein Projekt als ZIP-Datei hoch, damit es automatisch verarbeitet werden kann.
+        
+        1. Erstelle dein Projekt basierend auf dem Skeleton aus `/skeletons/home-assistant-template/`
+        2. Packe den kompletten Projektordner als ZIP
+        3. Ziehe die **ZIP-Datei** oben in das Textfeld hinein
+        4. Die README.md in der ZIP wird automatisch verwendet
+        
+        💡 **Tipp:** Falls die Validierung fehlschlägt, kannst du eine korrigierte ZIP als Kommentar hochladen!
+
+  - type: dropdown
+    id: project_type
+    attributes:
+      label: "Projekttyp"
+      options:
+        - "home-assistant"
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ## 📁 Erwartete Ordnerstruktur
+        ```
+        templates/home-assistant/<category>/<slug>/
+        ├── README.md
+        ├── configuration.yaml (oder lovelace.yaml)
+        └── (weitere .yaml Dateien)
+        ```
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "Prüfung abgeschlossen"
+      description: "Ich bestätige, dass ich alles korrekt vorbereitet habe"
+      options:
+        - label: "✅ Ich habe das Skeleton zur Erstellung der ZIP-Datei verwendet, 
+                  alle Dateien korrekt benannt, die README.md gefüllt,
+                  mein Projekt getestet und alle Ordner-/Dateinamen sind in kebab-case"
+          required: true
+

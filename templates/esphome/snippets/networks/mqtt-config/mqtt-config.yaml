@@ -1,0 +1,104 @@
+# MQTT-Konfiguration
+# Alternative zur Home Assistant API für Broker-basierte Kommunikation
+mqtt:
+  broker: !secret mqtt_broker  # IP-Adresse oder Hostname des MQTT-Brokers
+  port: 1883  # Standard MQTT Port (8883 für SSL)
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  
+  # Client-ID (muss für jedes Gerät eindeutig sein)
+  client_id: "${device_name}_${mac_suffix}"
+  
+  # Discovery-Einstellungen für Home Assistant
+  discovery: true
+  discovery_retain: false
+  discovery_prefix: "homeassistant"
+  discovery_unique_id_generator: mac  # mac, device_name
+  
+  # Topic-Präfix für dieses Gerät
+  topic_prefix: "esphome/${device_name}"
+  
+  # Verbindungseinstellungen
+  keepalive: 15s
+  reboot_timeout: 5min
+  
+  # SSL/TLS-Einstellungen (für sichere Verbindung auskommentieren)
+  # ssl_fingerprints:
+  #   - "SHA1 Fingerprint of your MQTT broker certificate"
+  # 
+  # # Oder Zertifikats-Verifizierung verwenden
+  # certificate_authority: |
+  #   -----BEGIN CERTIFICATE-----
+  #   ... your CA certificate here ...
+  #   -----END CERTIFICATE-----
+
+  # Last Will and Testament (Offline-Nachricht)
+  will_message:
+    topic: "${topic_prefix}/status"
+    payload: "offline"
+    retain: true
+  
+  # Birth-Nachricht (Online-Nachricht)
+  birth_message:
+    topic: "${topic_prefix}/status"
+    payload: "online"
+    retain: true
+
+  # Alle MQTT-Nachrichten protokollieren (für Debugging)
+  # log_topic:
+  #   topic: "${topic_prefix}/debug"
+  #   level: INFO
+
+# Optional: MQTT-spezifische Sensoren und Steuerungen
+sensor:
+  - platform: mqtt_subscribe
+    name: "${friendly_name} External Temperature"
+    id: external_temp
+    topic: "weather/temperature"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    filters:
+      - heartbeat: 300s  # Als nicht verfügbar markieren wenn 5 Min. kein Update
+
+# Optional: Eigene Daten zu MQTT publizieren
+interval:
+  - interval: 60s
+    then:
+      - mqtt.publish:
+          topic: "${topic_prefix}/custom/uptime"
+          payload: !lambda |-
+            return to_string(id(uptime_sensor).state);
+          retain: true
+
+# Optional: MQTT-Befehle abonnieren
+mqtt:
+  # ... (main config above)
+  
+  # Eigene Befehl-Abonnements
+  on_message:
+    - topic: "${topic_prefix}/command/restart"
+      then:
+        - logger.log: "Restart command received via MQTT"
+        - delay: 1s
+        - restart:
+    
+    - topic: "${topic_prefix}/command/led/set"
+      then:
+        - logger.log: 
+            format: "LED command: %s"
+            args: ['x']
+        - if:
+            condition:
+              lambda: 'return x == "ON";'
+            then:
+              - output.turn_on: status_led
+            else:
+              - output.turn_off: status_led
+
+# Benötigter Uptime-Sensor für obiges Beispiel
+sensor:
+  - platform: uptime
+    name: "${friendly_name} Uptime"
+    id: uptime_sensor
+    update_interval: 60s
