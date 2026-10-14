@@ -1,0 +1,615 @@
+# ============================================================================
+# ESPHome Konfiguration: Motorsteuerung via ESP32 + 2 Relais
+# >>> ZEITBASIERTE Steuerung mit REED-KONTAKT (untere Endlage) <<<
+# ============================================================================
+# Hardware:
+#   - ESP32 D1 Mini (Wemos D1 Mini ESP32 Formfaktor)
+#   - 2x Relaismodul (LOW-aktiv, mit 5V versorgt, 3.3V Logik)
+#   - 1x Taster (physisch, für Toggle-Steuerung mit STOP)
+#   - 1x WS2812B LED-Stripe (optional, für visuelle Rückmeldung)
+#   - 1x Reed-Kontakt (Referenz/Endlage "Position unten")
+#   - Original-Motorsteuerplatine mit Endschaltern (bleibt erhalten)
+#
+# Funktion:
+#   - ESP32 simuliert UP/DOWN-Tastendruck über Relais (parallel zum Original)
+#   - HOCH: fährt zeitbasiert (laufzeit_hoch) nach oben
+#   - RUNTER: fährt bis der Reed "ganz unten" meldet (Zeit als Backup)
+#   - Physischer Taster: Toggle HOCH/RUNTER + STOP während Fahrt
+#   - LED-Stripe: Lauflicht-Animation NUR bei Dämmerung/Nacht:
+#       rot  = fährt (hoch ODER runter)
+#       grün → warmweiß = oben angekommen, bleibt dauerhaft an
+#       aus  = unten angekommen / manuell gestoppt
+#   - Auto-Schließen: fährt nach X Minuten "oben" automatisch wieder nach unten
+#   - Dämmerungs-Erkennung über Sonnenstand (kein Lichtsensor nötig)
+#   - Sicherheit: Interlock verhindert gleichzeitiges UP+DOWN
+#   - Software-Timeout als zusätzliche Absicherung
+# ============================================================================
+
+substitutions:
+  # --- Geräte-Identifikation ---
+  device_name: schreibtisch              # Technischer Name (keine Leerzeichen!)
+  friendly_name: Schreibtisch            # Anzeigename (mit Leerzeichen erlaubt)
+
+  # --- GPIO-Pins für ESP32 D1 Mini ---
+  gpio_relay_up: GPIO19       # Pin D6 - Steuert UP-Relais (HOCH fahren)    [vorher GPIO18]
+  gpio_relay_down: GPIO18     # Pin D5 - Steuert DOWN-Relais (RUNTER fahren) [vorher GPIO19]
+
+  # --- GPIO-Pin für physischen Taster ---
+  gpio_button: GPIO23         # Pin D7 - Physischer Taster (gegen GND)
+
+  # --- WS2812 LED-Stripe (optional) ---
+  gpio_led_data: GPIO16       # Pin D4 - Datenleitung zum WS2812-Stripe
+  num_leds: "94"              # Anzahl LEDs im Stripe
+
+  # --- GPIO-Pin für Reed-Kontakt (untere Endlage) ---
+  gpio_reed_closed: GPIO33    # Reed-Kontakt für "Position unten"
+
+  # Frei bleiben: GPIO32, GPIO25, GPIO26, D1, D2 (für spätere Erweiterungen)
+
+  # --- Laufzeiten ---
+  laufzeit_hoch: "19s"        # Zeit für volle Aufwärtsfahrt
+  laufzeit_runter: "16s"      # RUNTER-Backup, falls Reed nicht auslöst (immer etwas länger als laufzeit_hoch!)
+
+  # --- Interlock-Wartezeit ---
+  interlock_wait: "500ms"     # Pause beim Umschalten UP<->DOWN
+
+  # --- Auto-Schließen ---
+  # Wie lange bleibt der Tisch oben, bevor er automatisch wieder runterfährt?
+  # Erlaubte Werte: "2min", "10min", "30min", "1h" usw.
+  # Zum Deaktivieren: Zeile "- script.execute: auto_close_timer" in run_up_full auskommentieren.
+  auto_close_zeit: "5min"     # Wartezeit bis zum automatischen Schließen
+
+  # --- Standort für Sonnenstand / Dämmerung ---
+  # HIER DEINE EIGENEN KOORDINATEN EINTRAGEN (z.B. von https://www.openstreetmap.org)
+  latitude: "0.0°"            # <-- Breitengrad eintragen
+  longitude: "0.0°"           # <-- Längengrad eintragen
+
+  # --- LED-Lauflicht Parameter ---
+  anim_breite: "6"            # Breite des roten Blocks in LEDs (bei 94 LEDs: 5-8 empfohlen)
+  anim_delay: "30"            # Geschwindigkeit in ms (kleiner = schneller)
+
+
+# ============================================================================
+# Basis-Konfiguration
+# ============================================================================
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+
+  on_boot:
+    priority: 600
+    then:
+      # SICHERHEIT: Beide Relais beim Start garantiert ausschalten
+      - switch.turn_off: relay_up
+      - switch.turn_off: relay_down
+
+esp32:
+  board: wemos_d1_mini32
+  framework:
+    type: arduino
+    advanced:
+      sram1_as_iram: true      
+      minimum_chip_revision: "3.1"
+  variant: ESP32
+
+# ============================================================================
+# WiFi-Konfiguration
+# ============================================================================
+wifi:
+  networks:
+    - ssid: !secret wifi_ssid
+      password: !secret wifi_password
+
+  # Optionale statische IP: eigene Werte eintragen oder diesen Block entfernen
+  # (dann bezieht der ESP32 seine IP per DHCP vom Router)
+  manual_ip:
+    static_ip: !secret static_ip     # Gewünschte statische IP (in secrets.yaml)
+    gateway: !secret gateway         # Router-IP (in secrets.yaml)
+    subnet: 255.255.255.0            # Subnetzmaske
+
+  ap:
+    ssid: "ESP_${device_name}"
+    password: !secret ap_password
+
+captive_portal:
+
+# ============================================================================
+# Logging & API
+# ============================================================================
+logger:
+  level: INFO
+
+api:
+
+ota:
+  - platform: esphome
+
+web_server:
+  port: 80
+
+# ============================================================================
+# Zeit + Sonnenstand 
+# ============================================================================
+time:
+  - platform: sntp
+    id: sntp_time
+  - platform: homeassistant
+    id: ha_time
+
+sun:
+  latitude: ${latitude}
+  longitude: ${longitude}
+  id: meine_sonne
+
+# ============================================================================
+# Globale Variablen
+# ============================================================================
+globals:
+  # --- Toggle-Status für physischen Taster ---
+  - id: last_direction_up
+    type: bool
+    restore_value: yes
+    initial_value: 'true'               # Startwert: nächster Druck = HOCH
+
+  # --- Status "oben/offen" ---
+  - id: box_ist_offen
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+
+  # --- LED-Animations-Zustand (für addressable_lambda) ---
+  # Aktuelle Position des Lauflicht-Blocks (0 = ganz links/außen)
+  - id: led_pos
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  # Laufrichtung des Lauflicht-Blocks (true = vorwärts/innen, false = rückwärts/außen)
+  - id: led_forward
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+
+# ============================================================================
+# WS2812 LED-Stripe (ESP32 RMT – Nachfolger von neopixelbus)
+# ============================================================================
+light:
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB                        
+    chipset: WS2812                       
+    pin: ${gpio_led_data}                 # GPIO16 (D4)
+    num_leds: ${num_leds}
+    id: desk_led
+    name: "${friendly_name} LED-Beleuchtung"
+    default_transition_length: 300ms
+    restore_mode: ALWAYS_OFF
+    effects:
+      # --- Standard-Effekte (manuell über HA wählbar) ---
+      - random:
+          name: "Random"
+          transition_length: 500ms
+          update_interval: 1s
+      - strobe:
+          name: "Strobe"
+      - pulse:
+          name: "Pulse"
+          transition_length: 1s
+          update_interval: 1s
+      - addressable_rainbow:
+          name: "Rainbow"
+          speed: 10
+          width: 50
+      - addressable_scan:
+          name: "Scan"
+          move_interval: 100ms
+      - addressable_color_wipe:
+          name: "Color Wipe"
+
+      # --- Statusanzeige: Rotes Lauflicht während Fahrt (hoch UND runter) ---
+      # Zwei rote Blöcke starten außen und laufen gegenläufig aufeinander zu und zurück.
+      # Breite und Geschwindigkeit über substitutions konfigurierbar.
+      - addressable_lambda:
+          name: "Lauflicht Rot"
+          update_interval: 16ms
+          lambda: |-
+            const int16_t LAST    = it.size() - 1;
+            const int16_t ANIM_B  = ${anim_breite};
+            // Maximale Position ohne Überschneidung der beiden Blöcke
+            const int16_t MAX_POS = (LAST - 2 * ANIM_B + 1) / 2;
+
+            if (initial_run) {
+              id(led_pos)     = 0;
+              id(led_forward) = true;
+              it.all()        = Color(0, 0, 0);
+            }
+
+            // Zweiter Block: symmetrisch von rechts, läuft entgegengesetzt
+            int16_t pos2 = LAST - ANIM_B - id(led_pos) + 1;
+
+            // Alles löschen, dann neu zeichnen (sauber und korrekt auch bei wenig LEDs)
+            it.all() = Color(0, 0, 0);
+            it.range(id(led_pos), id(led_pos) + ANIM_B) = Color(255, 0, 0);
+            // Zweiten Block nur zeichnen wenn kein Überlapp mit dem ersten
+            if (pos2 > id(led_pos) + ANIM_B) {
+              it.range(pos2, pos2 + ANIM_B) = Color(255, 0, 0);
+            }
+
+            // Position weiterbewegen (hin und her)
+            if (id(led_forward)) {
+              if (id(led_pos) < MAX_POS) {
+                id(led_pos)++;
+              } else {
+                id(led_forward) = false;  // Umkehren
+              }
+            } else {
+              if (id(led_pos) > 0) {
+                id(led_pos)--;
+              } else {
+                id(led_forward) = true;   // Umkehren
+              }
+            }
+
+            delay(${anim_delay});
+
+# ============================================================================
+# Binary Sensors (Taster + Reed-Endlage + Statusanzeigen)
+# ============================================================================
+binary_sensor:
+  # --- Physischer Toggle-Taster mit STOP-Funktion ---
+  - platform: gpio
+    id: physical_button
+    name: "${friendly_name} Wandtaster (Status)"
+    pin:
+      number: ${gpio_button}            # GPIO23 (D7)
+      mode: INPUT_PULLUP
+      inverted: true                    # LOW = gedrückt (true)
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_press:
+      then:
+        - lambda: |-
+            // Prüfen ob Motor gerade fährt (eines der Relais ist aktiv)
+            bool is_moving = id(relay_up).state || id(relay_down).state;
+
+            if (is_moving) {
+              // Motor fährt -> STOP
+              id(stop_all).execute();
+              ESP_LOGD("button", "Taster gedrückt: STOP");
+            } else {
+              // Motor steht -> Toggle HOCH/RUNTER
+              if (id(last_direction_up)) {
+                id(run_up_full).execute();
+                id(last_direction_up) = false;
+                ESP_LOGD("button", "Taster gedrückt: HOCH");
+              } else {
+                id(run_down_full).execute();
+                id(last_direction_up) = true;
+                ESP_LOGD("button", "Taster gedrückt: RUNTER");
+              }
+            }
+
+  # --- Reed-Kontakt: untere Endlage "Position unten" ---
+  # ROLLE: Stoppt das Runterfahren hart, sobald "ganz unten" erreicht ist.
+  - platform: gpio
+    id: reed_closed
+    name: "${friendly_name} Endlage Unten erreicht"
+    pin:
+      number: ${gpio_reed_closed}       # GPIO33
+      mode: INPUT_PULLUP
+      inverted: true                    # Kontakt geschlossen = ON / offen = OFF
+    filters:
+      - delayed_on: 100ms
+      - delayed_off: 100ms
+    on_press:
+      then:
+        # Reed schließt = Tisch fast unten -> kurz nachfahren bis echter Anschlag, dann stoppen
+        - delay: 400ms                  # Nachlaufzeit anpassen (200-600ms) bis Tisch ganz unten
+        - lambda: |-
+            if (id(relay_down).state) {
+              id(relay_down).turn_off();
+              id(box_ist_offen) = false;
+              ESP_LOGD("reed", "Untere Endlage erreicht -> STOP");
+            }
+        - script.execute: led_aus       # Tisch unten: LEDs ausschalten
+    on_release:
+      then:
+        # Reed öffnet = Tisch verlässt untere Position -> rotes Lauflicht starten
+        - script.execute: led_fahrt_start
+
+  # --- Virtueller Sensor: Motor in Bewegung ---
+  - platform: template
+    id: desk_moving
+    name: "${friendly_name} Motor fährt gerade"
+    lambda: |-
+      return (id(relay_up).state || id(relay_down).state);
+
+  # --- Dämmerungs-Sensor (nur Anzeige in HA) ---
+  # !sun.is_above_horizon() = true wenn Sonne unter dem Horizont → Dämmerung/Nacht
+  # Hinweis: WiFi-Fallback nur in den LED-Scripts relevant (or: not: wifi.connected)
+  - platform: template
+    id: ist_daemmerung
+    name: "${friendly_name} Dämmerung aktiv"
+    lambda: |-
+      return !id(meine_sonne).is_above_horizon() || id(daemmerung_override).state;
+
+# ============================================================================
+# Sensoren (Monitoring)
+# ============================================================================
+sensor:
+  # --- WiFi-Signalstärke ---
+  - platform: wifi_signal
+    name: "${friendly_name} WiFi Signal"
+    update_interval: 60s
+
+  # --- Betriebszeit (Uptime) ---
+  - platform: uptime
+    name: "${friendly_name} Uptime"
+    update_interval: 60s
+
+# ============================================================================
+# Schalter
+# ============================================================================
+switch:
+  # --- Dämmerungs-Override (zum Testen) ---
+  # Wenn EIN: LEDs verhalten sich so als wäre es Nacht, unabhängig vom Sonnenstand.
+  # Zum Testen der LED-Logik tagsüber einfach diesen Schalter in HA aktivieren.
+  - platform: template
+    name: "${friendly_name} Dämmerung Test-Override"
+    id: daemmerung_override
+    icon: "mdi:weather-night"
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+
+  # --- UP-Relais (HOCH fahren) ---
+  - platform: gpio
+    id: relay_up
+    name: "${friendly_name} UP (direkt)"
+    internal: true
+    pin:
+      number: ${gpio_relay_up}          # GPIO19 (D6)
+      mode: OUTPUT
+      inverted: false                 
+    interlock: [relay_down]
+    interlock_wait_time: ${interlock_wait}
+    restore_mode: ALWAYS_OFF
+
+  # --- DOWN-Relais (RUNTER fahren) ---
+  - platform: gpio
+    id: relay_down
+    name: "${friendly_name} DOWN (direkt)"
+    internal: true
+    pin:
+      number: ${gpio_relay_down}        # GPIO18 (D5)
+      mode: OUTPUT
+      inverted: false
+    interlock: [relay_up]
+    interlock_wait_time: ${interlock_wait}
+    restore_mode: ALWAYS_OFF
+
+# ============================================================================
+# Skripte
+# ============================================================================
+script:
+
+  # ==========================================================================
+  # LED-Hilfs-Skripte – Statusanzeige (NUR aktiv bei Dämmerung/Nacht)
+  # ==========================================================================
+
+  # --- LED AUS: Animationen stoppen und Stripe ausschalten ---
+  - id: led_aus
+    mode: restart
+    then:
+      # Laufende grüne Überblend-Animation abbrechen (falls gerade aktiv)
+      - script.stop: led_oben_fertig
+      - light.turn_off:
+          id: desk_led
+          transition_length: 300ms
+
+  # --- LED FAHRT: Rotes Lauflicht starten (nur bei Dämmerung / kein WiFi) ---
+  - id: led_fahrt_start
+    mode: restart
+    then:
+      - if:
+          condition:
+            or:
+              - not:
+                  - wifi.connected:
+              - lambda: 'return !id(meine_sonne).is_above_horizon() || id(daemmerung_override).state;'
+          then:
+            # Rotes Lauflicht einschalten (läuft bis led_aus aufgerufen wird)
+            - light.turn_on:
+                id: desk_led
+                brightness: 1.0
+                effect: "Lauflicht Rot"
+
+  # --- LED OBEN FERTIG: Grüner Blitz -> dauerhaft Warmweiß (nur bei Dämmerung / kein WiFi) ---
+  - id: led_oben_fertig
+    mode: restart
+    then:
+      - if:
+          condition:
+            or:
+              - not:
+                  - wifi.connected:
+              - lambda: 'return !id(meine_sonne).is_above_horizon() || id(daemmerung_override).state;'
+          then:
+            # 1. Laufenden Effekt explizit stoppen (addressable_lambda überschreibt sonst sofort)
+            - light.turn_off:
+                id: desk_led
+                transition_length: 0ms
+            - delay: 50ms
+            # 2. Grün aufleuchten: Signal "oben angekommen!"
+            - light.turn_on:
+                id: desk_led
+                red: 0.0
+                green: 1.0
+                blue: 0.0
+                brightness: 1.0
+                transition_length: 200ms
+            # 3. Kurz grün halten
+            - delay: 2s
+            # 4. Sanfter Übergang auf Warmweiß – bleibt dauerhaft an bis nächster Befehl
+            - light.turn_on:
+                id: desk_led
+                red: 1.0
+                green: 0.78
+                blue: 0.39
+                brightness: 1.0
+                transition_length: 1s
+
+  # ==========================================================================
+  # Motor-Skripte
+  # ==========================================================================
+
+  # --- STOP: Motor sofort anhalten, LEDs ausschalten ---
+  - id: stop_all
+    then:
+      - script.stop: auto_close_timer
+      - script.stop: led_oben_fertig   # Laufende Grün-Animation abbrechen
+      - switch.turn_off: relay_up
+      - switch.turn_off: relay_down
+      - script.execute: led_aus        # LEDs ausschalten
+
+  # --- HOCH (voll): zeitbasiert nach oben fahren ---
+  - id: run_up_full
+    mode: restart
+    then:
+      - script.execute: stop_all
+      - delay: 200ms                        # Kurze Pause (Interlock/Mechanik)
+      # Lauflicht direkt starten – Reed on_release feuert nur wenn Tisch vorher ganz unten war
+      - script.execute: led_fahrt_start
+      - switch.turn_on: relay_up
+      - logger.log: "Fahre HOCH (zeitbasiert)"
+      - delay: ${laufzeit_hoch}             
+      - switch.turn_off: relay_up
+      - lambda: 'id(box_ist_offen) = true;'
+      - script.execute: led_oben_fertig     # Grün -> Warmweiß (nur bei Dämmerung)
+      - script.execute: auto_close_timer    # Auto-Close-Timer starten
+      - logger.log: "HOCH abgeschlossen -> offen"
+
+  # --- RUNTER (voll): bis Reed "unten" meldet (Zeit als Backup) ---
+  - id: run_down_full
+    mode: restart
+    then:
+      - script.execute: stop_all
+      - delay: 200ms
+      # Falls schon unten (Reed geschlossen): gar nicht erst losfahren
+      - if:
+          condition:
+            binary_sensor.is_on: reed_closed
+          then:
+            - logger.log: "Bereits ganz unten (Reed) - keine Fahrt noetig"
+            - lambda: 'id(box_ist_offen) = false;'
+          else:
+            # Rotes Lauflicht starten (Reed ist oben offen, on_release feuert nicht)
+            - script.execute: led_fahrt_start
+            - switch.turn_on: relay_down
+            - logger.log: "Fahre RUNTER (bis Reed / Backup-Zeit)"
+            # Im Normalfall stoppt der Reed-Kontakt (on_press oben) die Fahrt.
+            # Backup: falls der Reed NICHT auslöst, nach Laufzeit hart stoppen.
+            - delay: ${laufzeit_runter}          
+            - if:
+                condition:
+                  switch.is_on: relay_down
+                then:
+                  # Reed hat nicht ausgelöst -> Backup-Stopp
+                  - switch.turn_off: relay_down
+                  - logger.log: "RUNTER Backup-Timeout - hart gestoppt"
+                  - script.execute: led_aus      # LEDs nach Backup ausschalten
+            - lambda: 'id(box_ist_offen) = false;'
+
+  # --- AUTO-CLOSE: nach X Minuten "oben" automatisch runter ---
+  - id: auto_close_timer
+    mode: restart
+    then:
+      - delay: ${auto_close_zeit}
+      - logger.log: "Auto-Schliessen: Zeit abgelaufen, fahre runter"
+      - script.execute: run_down_full
+
+# ============================================================================
+# Buttons (Komfort-Bedienung für Home Assistant / Web-Interface)
+# ============================================================================
+button:
+  # --- HOCH Button ---
+  - platform: template
+    name: "${friendly_name} Fahrt HOCH"
+    icon: "mdi:arrow-up-bold"
+    on_press:
+      - script.execute: run_up_full
+
+  # --- RUNTER Button ---
+  - platform: template
+    name: "${friendly_name} Fahrt RUNTER"
+    icon: "mdi:arrow-down-bold"
+    on_press:
+      - script.execute: run_down_full
+
+  # --- STOP Button ---
+  - platform: template
+    name: "${friendly_name} STOPP (Alles anhalten)"
+    icon: "mdi:stop"
+    on_press:
+      - script.execute: stop_all
+
+# ============================================================================
+# Text-Sensoren (IP-Adresse, SSID)
+# ============================================================================
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${friendly_name} IP"
+    ssid:
+      name: "${friendly_name} SSID"
+
+# ============================================================================
+# WICHTIGE HINWEISE ZUR VERKABELUNG
+# ============================================================================
+#
+# ESP32 zu Relais-Modul (Steuer-Seite):
+#   - ESP32 3V3 → Relais VCC
+#   - ESP32 GND → Relais GND
+#   - ESP32 GPIO19 (D6) → Relais IN1 (UP)
+#   - ESP32 GPIO18 (D5) → Relais IN2 (DOWN)
+#
+# Relais-Modul zu Motorplatine (Schalt-Seite):
+#   - Motorplatine COM → Relais 1 COM + Relais 2 COM (Brücke!)
+#   - Motorplatine UP  → Relais 1 NO
+#   - Motorplatine DOWN→ Relais 2 NO
+#
+# Physischer Taster:   GPIO23 (D7) gegen GND
+# Reed-Kontakt:        GPIO33 gegen GND
+# WS2812 Daten:        GPIO16 (D4)
+#
+# ============================================================================
+# SICHERHEITS- & BEDIENHINWEISE
+# ============================================================================
+#
+# 1. RUNTER-STOPP:
+#    - Im Normalfall stoppt der REED beim Erreichen "ganz unten" (on_press).
+#    - Die Backup-Zeit (laufzeit_runter) stoppt nur, falls der Reed NICHT auslöst.
+#
+# 2. HOCH-STOPP:
+#    - Rein zeitbasiert (laufzeit_hoch). Zeit ggf. an echte Fahrzeit anpassen.
+#
+# 3. INTERLOCK: NIEMALS entfernen (verhindert gleichzeitiges UP+DOWN)
+#
+# 4. RELAIS-LOGIK: Bei LOW-aktivem Modul "inverted: true" bei beiden Relais
+#
+# 5. STROM: ESP32 über USB (5V), Relais über 3V3, KEINE 28V-Verbindung!
+#
+# 6. LED NUR BEI DÄMMERUNG: LEDs sind nur aktiv wenn die Sonne unter dem Horizont ist.
+#    Berechnung erfolgt über die sun:-Komponente mit Koordinaten aus den substitutions.
+#    Ohne WiFi sind LEDs immer aktiv (autarker Betrieb).
+#
+# 7. LED-SEQUENZ (nur bei Dämmerung, gesteuert durch Reed-Kontakt):
+#    - Reed öffnet (Tisch verlässt Unten): rotes Lauflicht startet
+#    - Reed schließt (Tisch erreicht Unten): LEDs aus
+#    - Motor HOCH stoppt (Tisch oben, kein Sensor): 2s grün -> dauerhaft warmweiß
+#    - Manueller STOPP: LEDs aus
+#
+# 8. LED-ANPASSUNG:
+#    - anim_breite: Blockbreite in LEDs (bei 94 LEDs: 5-8 empfohlen)
+#    - anim_delay:  Geschwindigkeit in ms (kleiner = schneller, z.B. 20-60)
+#
+# ============================================================================
